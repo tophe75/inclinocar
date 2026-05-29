@@ -100,6 +100,15 @@ jobs:
           echo "${{ steps.tag.outputs.tag }}" > docs/bins/version.txt
           ls -lh docs/bins/
 
+      - name: Bundle esptool-js into docs/libs for self-hosting
+        run: |
+          mkdir -p docs/libs
+          npm pack esptool-js@0.6.0
+          tar -xzf esptool-js-*.tgz
+          # Copy the pre-built bundle — no CDN, no corruption
+          cp package/bundle.js docs/libs/esptool-bundle.js
+          echo "esptool-js bundle size:  bytes"
+
       - name: Commit binaries to main branch
         run: |
           git config user.name  "github-actions[bot]"

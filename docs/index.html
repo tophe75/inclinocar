@@ -631,26 +631,26 @@ async function startFlash() {
 
   try {
     log('Loading esptool.js…');
-    // Use esm.sh which pre-bundles all dependencies (including pako) into one module
-    const esptool = await import('https://esm.sh/esptool-js@0.6.0');
-    const { ESPLoader, Transport } = esptool;
+    // Load self-hosted bundle committed to docs/libs by CI — avoids CDN corruption
+    await loadScript('./libs/esptool-bundle.js');
+    // esptool-js UMD bundle attaches to window.esptooljs
+    const { ESPLoader, Transport } = window.esptooljs || window;
+    if (!ESPLoader || !Transport) throw new Error('esptool-bundle.js did not load correctly');
     log('esptool.js loaded', 'ok');
 
     setProgress('Connecting to chip…', 5);
-    // debugLogging=false, disableStub=true — avoids atob stub corruption via CDN bundling
-    const transport = new Transport(serialPort, false);
+    const transport = new Transport(serialPort, true);
     const loader = new ESPLoader({
       transport,
-      baudrate: 115200,
+      baudrate: 460800,
       terminal: {
         clean()      {},
         writeLine(s) { log(s); },
         write(s)     {},
       },
-      debugLogging: false,
     });
 
-    const chip = await loader.main(true);  // true = disableStub
+    const chip = await loader.main();
     log(`Chip detected: ${chip}`, 'ok');
     setProgress(`Chip: ${chip}`, 15);
 
