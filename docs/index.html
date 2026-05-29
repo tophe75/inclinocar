@@ -625,8 +625,8 @@ async function startFlash() {
 
   try {
     log('Loading esptool.js…');
-    // esptool-js is an ES module — use dynamic import from CDN
-    const esptool = await import('https://unpkg.com/esptool-js@0.6.0/lib/index.js');
+    // Use esm.sh which pre-bundles all dependencies (including pako) into one module
+    const esptool = await import('https://esm.sh/esptool-js@0.6.0');
     const { ESPLoader, Transport } = esptool;
     log('esptool.js loaded', 'ok');
 
