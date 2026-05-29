@@ -632,11 +632,13 @@ async function startFlash() {
   try {
     log('Loading esptool.js…');
     // Load self-hosted bundle committed to docs/libs by CI — avoids CDN corruption
-    await loadScript('./libs/esptool-bundle.js');
-    // esptool-js UMD bundle attaches to window.esptooljs
-    const { ESPLoader, Transport } = window.esptooljs || window;
-    if (!ESPLoader || !Transport) throw new Error('esptool-bundle.js did not load correctly');
-    log('esptool.js loaded', 'ok');
+    // Self-hosted ES module — dynamic import avoids CDN corruption
+    const esptool = await import('./libs/esptool-bundle.js');
+    // Log all keys to diagnose what the bundle actually exports
+    log('Bundle keys: ' + Object.keys(esptool).join(', '), 'ok');
+    const ESPLoader = esptool.ESPLoader;
+    const Transport = esptool.Transport;
+    if (!ESPLoader || !Transport) throw new Error('Bundle loaded but ESPLoader/Transport missing. Keys: ' + Object.keys(esptool).join(', '));
 
     setProgress('Connecting to chip…', 5);
     const transport = new Transport(serialPort, true);
