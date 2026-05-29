@@ -637,18 +637,20 @@ async function startFlash() {
     log('esptool.js loaded', 'ok');
 
     setProgress('Connecting to chip…', 5);
-    const transport = new Transport(serialPort, true);
+    // debugLogging=false, disableStub=true — avoids atob stub corruption via CDN bundling
+    const transport = new Transport(serialPort, false);
     const loader = new ESPLoader({
       transport,
-      baudrate: 460800,
+      baudrate: 115200,
       terminal: {
         clean()      {},
         writeLine(s) { log(s); },
         write(s)     {},
       },
+      debugLogging: false,
     });
 
-    const chip = await loader.main();
+    const chip = await loader.main(true);  // true = disableStub
     log(`Chip detected: ${chip}`, 'ok');
     setProgress(`Chip: ${chip}`, 15);
 
