@@ -624,13 +624,44 @@ async function startFlash() {
   log(`Flashing ${selectedFw === 'core' ? 'Core Unit' : 'Satellite Display'} — release ${releaseTag}`);
 
   try {
-    if (!window.esptoolModule) {
-      log('Loading esptool.js…');
-      await loadScript('https://unpkg.com/esptool-js@0.4.3/bundle.js');
-      log('esptool.js loaded', 'ok');
+    log('Loading esptool.js…');
+    // Use esp-web-tools' underlying esptool which is known to work in browsers
+    await loadScript('https://unpkg.com/esptool-js@0.4.3/bundle.js');
+    log('esptool.js loaded', 'ok');
+
+    // esptool-js@0.4.x attaches to window directly as ESPLoader and Transport
+    // Try all known export patterns
+    let ESPLoader, Transport;
+    if (window.esptooljs) {
+      ({ ESPLoader, Transport } = window.esptooljs);
+    } else if (window.ESPLoader && window.Transport) {
+      ESPLoader = window.ESPLoader;
+      Transport = window.Transport;
+    } else if (window.esptool) {
+      ({ ESPLoader, Transport } = window.esptool);
+    } else {
+      // Last resort — scan window for constructor-like objects
+      for (const key of Object.keys(window)) {
+        if (key === 'ESPLoader' || key === 'Transport') continue;
+        const val = window[key];
+        if (val && typeof val === 'object' && val.ESPLoader) {
+          ESPLoader = val.ESPLoader;
+          Transport = val.Transport;
+          break;
+        }
+      }
     }
 
-    const { ESPLoader, Transport } = window.esptoolModule || window;
+    if (!ESPLoader || !Transport) {
+      // Log what esptool-js actually exported to help debug
+      const keys = Object.keys(window).filter(k =>
+        k.toLowerCase().includes('esp') || k.toLowerCase().includes('transport') || k.toLowerCase().includes('loader')
+      );
+      log('Available globals: ' + (keys.join(', ') || 'none found'), 'warn');
+      throw new Error('Could not find ESPLoader/Transport in esptool-js bundle. Check log for available globals.');
+    }
+
+    log(`ESPLoader and Transport found`, 'ok');
 
     setProgress('Connecting to chip…', 5);
     const transport = new Transport(serialPort, true);
