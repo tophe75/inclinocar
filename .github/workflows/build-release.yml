@@ -34,9 +34,20 @@ jobs:
       - name: Install PlatformIO
         run: pip install platformio && pio --version
 
+      - name: Determine version tag
+        id: ver
+        run: |
+          if [[ "${GITHUB_REF}" == refs/tags/* ]]; then
+            echo "tag=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+          else
+            echo "tag=dev" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build ${{ matrix.unit }} firmware
         working-directory: ${{ matrix.project }}
         run: pio run -v
+        env:
+          PLATFORMIO_BUILD_FLAGS: -DFW_VERSION=\"${{ steps.ver.outputs.tag }}\" 
 
       - name: Collect binaries
         run: |
