@@ -6,8 +6,6 @@ on:
       - 'v*'
   workflow_dispatch:
 
-env:
-
 jobs:
   build-firmware:
     name: Build ESP32 Firmware (${{ matrix.unit }})
