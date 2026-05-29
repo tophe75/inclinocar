@@ -681,7 +681,8 @@ async function startFlash() {
     });
 
     setProgress('Resetting device…', 99);
-    await loader.hardReset();
+    // Hard reset via RTS pin, then disconnect
+    await loader.after('hard_reset');
     await transport.disconnect();
     setProgress('Done!', 100);
     log(`✓ Flash complete`, 'ok');
