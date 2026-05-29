@@ -7,7 +7,6 @@ on:
   workflow_dispatch:
 
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build-firmware:
@@ -25,10 +24,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Cache PlatformIO
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ~/.platformio
           key: platformio-${{ runner.os }}-${{ hashFiles(format('{0}/platformio.ini', matrix.project)) }}
@@ -51,7 +50,7 @@ jobs:
           ls -lh dist/${{ matrix.unit }}/
 
       - name: Upload build artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: firmware-${{ matrix.unit }}
           path: dist/${{ matrix.unit }}/
@@ -66,18 +65,18 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: main
 
       - name: Download core artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: firmware-core
           path: dist/core/
 
       - name: Download satellite artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: firmware-satellite
           path: dist/satellite/
