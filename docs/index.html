@@ -823,7 +823,7 @@ function loadScript(src) {
 
 function resetAll() { location.reload(); }
 
-function flashAnother() {
+async function flashAnother() {
   serialPort = null;
   document.getElementById('card-connect').classList.remove('success');
   document.getElementById('connect-icon').textContent = '○';
