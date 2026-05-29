@@ -7,28 +7,30 @@ import '../models/inclination_data.dart';
 enum BleStatus { idle, scanning, connecting, connected, disconnected, error }
 
 class BleService extends ChangeNotifier {
-  BleStatus _status = BleStatus.idle;
+  BleStatus _status        = BleStatus.idle;
   BluetoothDevice? _device;
-  InclinationData _data = InclinationData(pitch: 0, roll: 0);
-  String _errorMessage = '';
+  InclinationData _data    = InclinationData(pitch: 0, roll: 0);
+  String _errorMessage     = '';
+  bool _isCalibrated       = false;
+  bool _isCalibrating      = false;
 
-  // Internal state for partial updates
-  double _pitch    = 0;
-  double _roll     = 0;
-  double? _satPitch;
-  double? _satRoll;
+  double _pitch = 0;
+  double _roll  = 0;
 
+  BluetoothCharacteristic? _calibChar;
   final List<StreamSubscription> _subscriptions = [];
 
-  BleStatus get status        => _status;
-  InclinationData get data    => _data;
-  String get errorMessage     => _errorMessage;
-  bool get isConnected        => _status == BleStatus.connected;
+  BleStatus get status          => _status;
+  InclinationData get data      => _data;
+  String get errorMessage       => _errorMessage;
+  bool get isConnected          => _status == BleStatus.connected;
+  bool get isCalibrated         => _isCalibrated;
+  bool get isCalibrating        => _isCalibrating;
 
   // ─── Scan & Connect ───────────────────────────────────────────
   Future<void> startScan() async {
+    _errorMessage = '';
     _setStatus(BleStatus.scanning);
-
     await FlutterBluePlus.stopScan();
 
     final sub = FlutterBluePlus.scanResults.listen((results) {
@@ -43,8 +45,6 @@ class BleService extends ChangeNotifier {
     _subscriptions.add(sub);
 
     await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
-
-    // If still scanning after timeout = not found
     if (_status == BleStatus.scanning) {
       _setStatus(BleStatus.idle);
       _errorMessage = 'InclinoCar device not found. Is it powered on?';
@@ -55,18 +55,17 @@ class BleService extends ChangeNotifier {
   Future<void> _connect(BluetoothDevice device) async {
     _setStatus(BleStatus.connecting);
     _device = device;
-
     try {
       await device.connect(autoConnect: false);
       _setStatus(BleStatus.connected);
 
       final sub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
+          _isCalibrated = false;
           _setStatus(BleStatus.disconnected);
         }
       });
       _subscriptions.add(sub);
-
       await _discoverServices(device);
     } catch (e) {
       _errorMessage = 'Connection failed: $e';
@@ -80,39 +79,61 @@ class BleService extends ChangeNotifier {
       if (service.uuid.toString() == BleUuids.service) {
         for (final char in service.characteristics) {
           final uuid = char.uuid.toString();
-          if ([BleUuids.pitch, BleUuids.roll, BleUuids.satPitch, BleUuids.satRoll]
-              .contains(uuid)) {
+          if (uuid == BleUuids.pitch || uuid == BleUuids.roll) {
             await char.setNotifyValue(true);
             final sub = char.lastValueStream.listen((value) {
-              if (value.length >= 4) _onCharacteristicValue(uuid, value);
+              if (value.length >= 4) _onCharValue(uuid, value);
+            });
+            _subscriptions.add(sub);
+          }
+          if (uuid == BleUuids.calibrate) {
+            _calibChar = char;
+          }
+          if (uuid == BleUuids.status) {
+            await char.setNotifyValue(true);
+            final sub = char.lastValueStream.listen((value) {
+              if (value.isNotEmpty && value[0] == 0x01) {
+                _isCalibrated  = true;
+                _isCalibrating = false;
+                notifyListeners();
+              }
             });
             _subscriptions.add(sub);
           }
         }
       }
     }
+    // Assume calibrated after connect (core calibrates on boot)
+    _isCalibrated = true;
+    notifyListeners();
   }
 
-  void _onCharacteristicValue(String uuid, List<int> value) {
+  void _onCharValue(String uuid, List<int> value) {
     final v = InclinationData.parseFloat(value);
-    switch (uuid) {
-      case BleUuids.pitch:    _pitch    = v; break;
-      case BleUuids.roll:     _roll     = v; break;
-      case BleUuids.satPitch: _satPitch = v; break;
-      case BleUuids.satRoll:  _satRoll  = v; break;
-    }
-    _data = InclinationData(
-      pitch:    _pitch,
-      roll:     _roll,
-      satPitch: _satPitch,
-      satRoll:  _satRoll,
-    );
+    if (uuid == BleUuids.pitch) _pitch = v;
+    if (uuid == BleUuids.roll)  _roll  = v;
+    _data = InclinationData(pitch: _pitch, roll: _roll);
     notifyListeners();
+  }
+
+  // ─── Calibration ──────────────────────────────────────────────
+  Future<void> resetCalibration() async {
+    if (_calibChar == null) return;
+    _isCalibrating = true;
+    _isCalibrated  = false;
+    notifyListeners();
+    try {
+      await _calibChar!.write([0x01], withoutResponse: false);
+    } catch (e) {
+      _isCalibrating = false;
+      notifyListeners();
+    }
   }
 
   Future<void> disconnect() async {
     await _device?.disconnect();
     _cancelSubscriptions();
+    _isCalibrated = false;
     _setStatus(BleStatus.idle);
   }
 

@@ -10,11 +10,11 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final ble = context.watch<BleService>();
-
     return Scaffold(
       backgroundColor: const Color(0xFF0D1A0D),
       appBar: AppBar(
         backgroundColor: const Color(0xFF0D1A0D),
+        elevation: 0,
         title: Row(
           children: [
             const Text('InclinoCar',
@@ -46,6 +46,35 @@ class _ConnectedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final data = ble.data;
+
+    // Calibrating overlay
+    if (ble.isCalibrating) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const SizedBox(
+              width: 48, height: 48,
+              child: CircularProgressIndicator(
+                color: Color(0xFF4CAF50), strokeWidth: 2),
+            ),
+            const SizedBox(height: 24),
+            const Text('Calibrating…',
+              style: TextStyle(
+                color: Color(0xFF4CAF50),
+                fontSize: 20,
+                fontWeight: FontWeight.w300,
+                letterSpacing: 3,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text('Keep the unit still',
+              style: TextStyle(color: Color(0xFF5A7A5A), fontSize: 14)),
+          ],
+        ),
+      );
+    }
+
     return Column(
       children: [
         const SizedBox(height: 16),
@@ -56,14 +85,10 @@ class _ConnectedView extends StatelessWidget {
           margin: const EdgeInsets.symmetric(horizontal: 24),
           padding: const EdgeInsets.symmetric(vertical: 10),
           decoration: BoxDecoration(
-            color: data.isLevel
-                ? const Color(0xFF1A3A1A)
-                : const Color(0xFF3A1A0A),
+            color: data.isLevel ? const Color(0xFF1A3A1A) : const Color(0xFF3A1A0A),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: data.isLevel
-                  ? const Color(0xFF4CAF50)
-                  : const Color(0xFFFF9800),
+              color: data.isLevel ? const Color(0xFF4CAF50) : const Color(0xFFFF9800),
             ),
           ),
           child: Row(
@@ -91,9 +116,9 @@ class _ConnectedView extends StatelessWidget {
         const SizedBox(height: 24),
 
         // Bubble level
-        Center(child: BubbleLevelWidget(data: data, size: 240)),
+        Center(child: BubbleLevelWidget(data: data, size: 220)),
 
-        const SizedBox(height: 24),
+        const SizedBox(height: 20),
 
         // Angle readout
         Container(
@@ -107,40 +132,40 @@ class _ConnectedView extends StatelessWidget {
           child: AngleReadout(data: data),
         ),
 
-        // Satellite data (if available)
-        if (data.satPitch != null) ...[
-          const SizedBox(height: 12),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            decoration: BoxDecoration(
-              color: const Color(0xFF111E11),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFF2A3A2A)),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                const Text('CAR BODY',
-                  style: TextStyle(color: Color(0xFF5A7A5A), fontSize: 11, letterSpacing: 2)),
-                Text('P: ${data.satPitch!.toStringAsFixed(1)}°',
-                  style: const TextStyle(color: Color(0xFF7AAA7A), fontSize: 14)),
-                Text('R: ${data.satRoll!.toStringAsFixed(1)}°',
-                  style: const TextStyle(color: Color(0xFF7AAA7A), fontSize: 14)),
-              ],
-            ),
-          ),
-        ],
-
         const Spacer(),
 
-        // Disconnect button
+        // Bottom action row
         Padding(
-          padding: const EdgeInsets.all(24),
-          child: TextButton(
-            onPressed: ble.disconnect,
-            child: const Text('Disconnect',
-              style: TextStyle(color: Color(0xFF5A7A5A))),
+          padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+          child: Row(
+            children: [
+              // Calibrate button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: ble.isCalibrating ? null : ble.resetCalibration,
+                  icon: const Icon(Icons.tune, size: 16),
+                  label: const Text('Recalibrate'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4CAF50),
+                    side: const BorderSide(color: Color(0xFF2A4A2A)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Disconnect button
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: ble.disconnect,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF5A7A5A),
+                    side: const BorderSide(color: Color(0xFF1E2E1E)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  ),
+                  child: const Text('Disconnect'),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -155,7 +180,7 @@ class _DisconnectedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isScanning = ble.status == BleStatus.scanning;
+    final isScanning   = ble.status == BleStatus.scanning;
     final isConnecting = ble.status == BleStatus.connecting;
 
     return Center(
@@ -164,7 +189,6 @@ class _DisconnectedView extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Icon
             Container(
               padding: const EdgeInsets.all(28),
               decoration: BoxDecoration(
@@ -174,9 +198,7 @@ class _DisconnectedView extends StatelessWidget {
               child: const Icon(Icons.terrain,
                 color: Color(0xFF4CAF50), size: 48),
             ),
-
             const SizedBox(height: 32),
-
             const Text('InclinoCar',
               style: TextStyle(
                 color: Color(0xFF4CAF50),
@@ -185,13 +207,9 @@ class _DisconnectedView extends StatelessWidget {
                 letterSpacing: 6,
               ),
             ),
-
             const SizedBox(height: 8),
-
             const Text('Rooftop Tent Leveling',
-              style: TextStyle(color: Color(0xFF5A7A5A), fontSize: 14, letterSpacing: 2),
-            ),
-
+              style: TextStyle(color: Color(0xFF5A7A5A), fontSize: 14, letterSpacing: 2)),
             const SizedBox(height: 40),
 
             if (ble.errorMessage.isNotEmpty) ...[
@@ -226,15 +244,11 @@ class _DisconnectedView extends StatelessWidget {
                     ? Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const SizedBox(
-                            width: 16, height: 16,
+                          const SizedBox(width: 16, height: 16,
                             child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Color(0xFF4CAF50),
-                            ),
-                          ),
+                              strokeWidth: 2, color: Color(0xFF4CAF50))),
                           const SizedBox(width: 12),
-                          Text(isScanning ? 'Scanning...' : 'Connecting...'),
+                          Text(isScanning ? 'Scanning…' : 'Connecting…'),
                         ],
                       )
                     : const Text('Connect to InclinoCar',
@@ -258,10 +272,10 @@ class _ConnectionBadge extends StatelessWidget {
     Color color;
     String label;
     switch (status) {
-      case BleStatus.connected:    color = const Color(0xFF4CAF50); label = 'Connected'; break;
-      case BleStatus.scanning:     color = const Color(0xFFFF9800); label = 'Scanning';  break;
-      case BleStatus.connecting:   color = const Color(0xFFFF9800); label = 'Connecting'; break;
-      default:                     color = const Color(0xFF5A5A5A); label = 'Offline';
+      case BleStatus.connected:  color = const Color(0xFF4CAF50); label = 'Connected';  break;
+      case BleStatus.scanning:   color = const Color(0xFFFF9800); label = 'Scanning';   break;
+      case BleStatus.connecting: color = const Color(0xFFFF9800); label = 'Connecting'; break;
+      default:                   color = const Color(0xFF5A5A5A); label = 'Offline';
     }
     return Row(
       children: [

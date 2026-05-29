@@ -3,15 +3,16 @@ name: Build & Release Firmware
 on:
   push:
     tags:
-      - 'v*'          # Trigger on version tags: v1.0.0, v1.2.3, etc.
-  workflow_dispatch:  # Allow manual trigger from GitHub Actions UI
+      - 'v*'
+  workflow_dispatch:
 
 jobs:
   build-firmware:
-    name: Build ESP32 Firmware
+    name: Build ESP32 Firmware (${{ matrix.unit }})
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false
       matrix:
         include:
           - unit: core
@@ -22,33 +23,41 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Cache PlatformIO
         uses: actions/cache@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           path: ~/.platformio
-          key: platformio-${{ runner.os }}-${{ hashFiles('**/platformio.ini') }}
+          key: platformio-${{ runner.os }}-${{ hashFiles(format('{0}/platformio.ini', matrix.project)) }}
           restore-keys: platformio-${{ runner.os }}-
 
       - name: Install PlatformIO
-        run: pip install platformio
+        run: |
+          pip install platformio
+          pio --version
 
       - name: Build ${{ matrix.unit }} firmware
         working-directory: ${{ matrix.project }}
-        run: pio run
+        run: pio run -v
 
       - name: Collect binaries
         run: |
           mkdir -p dist/${{ matrix.unit }}
-          # PlatformIO output for ESP32-C3
-          cp ${{ matrix.project }}/.pio/build/esp32-c3-devkitm-1/bootloader.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-bootloader.bin
-          cp ${{ matrix.project }}/.pio/build/esp32-c3-devkitm-1/partitions.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-partitions.bin
-          cp ${{ matrix.project }}/.pio/build/esp32-c3-devkitm-1/firmware.bin    dist/${{ matrix.unit }}/${{ matrix.unit }}-firmware.bin
+          BUILD=.pio/build/esp32-c3-devkitm-1
+          cp ${{ matrix.project }}/${BUILD}/bootloader.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-bootloader.bin
+          cp ${{ matrix.project }}/${BUILD}/partitions.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-partitions.bin
+          cp ${{ matrix.project }}/${BUILD}/firmware.bin    dist/${{ matrix.unit }}/${{ matrix.unit }}-firmware.bin
           echo "--- Built binaries ---"
           ls -lh dist/${{ matrix.unit }}/
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           name: firmware-${{ matrix.unit }}
           path: dist/${{ matrix.unit }}/
@@ -64,15 +73,21 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Download core artifacts
         uses: actions/download-artifact@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           name: firmware-core
           path: dist/core/
 
       - name: Download satellite artifacts
         uses: actions/download-artifact@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           name: firmware-satellite
           path: dist/satellite/

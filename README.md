@@ -1,10 +1,10 @@
 # InclinoCar 🏕️
 
-A rooftop tent leveling assistant using ESP32-C3, MPU-6050 IMU sensors, and a Flutter mobile app.
+A rooftop tent leveling assistant using ESP32-C3, MPU-6050 IMU, and a Flutter mobile app.
 
 ## Overview
 
-InclinoCar helps you level your rooftop tent before sleeping. It measures the pitch and roll of your tent and guides you through the leveling process using ramp boards or wheel chocks — all from your phone or a small OLED display mounted on the unit.
+InclinoCar helps you level your rooftop tent before sleeping. Mount the Core Unit on the tent or roof rack — it measures pitch and roll and guides you through placing ramps or wheel chocks. Read the angles on the built-in OLED, your phone, or a remote Satellite Display unit inside the car.
 
 ---
 
@@ -13,22 +13,24 @@ InclinoCar helps you level your rooftop tent before sleeping. It measures the pi
 ### Core Unit (ESP32 #1) — Required
 | Component | Model | Notes |
 |-----------|-------|-------|
-| Microcontroller | ESP32-C3 | BLE + ESP-NOW capable |
+| Microcontroller | ESP32-C3 | BLE + ESP-NOW |
 | IMU | GY-521 (MPU-6050) | 3-axis gyro + accelerometer, I2C |
-| Display (optional) | SSD1306 128×64 OLED | I2C, 0.96 inch, blue |
+| Display | SSD1306 128×64 OLED | I2C, 0.96 inch |
+| Button | Momentary push button | Calibration reset, GPIO3 → GND |
 
-### Satellite Unit (ESP32 #2) — Optional
+### Satellite Display Unit (ESP32 #2) — Optional
 | Component | Model | Notes |
 |-----------|-------|-------|
-| Microcontroller | ESP32-C3 | ESP-NOW transmitter |
-| IMU | GY-521 (MPU-6050) | Same as core unit |
+| Microcontroller | ESP32-C3 | ESP-NOW receiver |
+| Display | SSD1306 128×64 OLED | I2C, 0.96 inch |
+
+No IMU on the Satellite — it only receives data from the Core and displays it. Place it anywhere convenient in the car or tent.
 
 ---
 
 ## Wiring
 
 ### Core Unit
-
 ```
 MPU-6050 (GY-521)          ESP32-C3
 ─────────────────          ─────────
@@ -37,7 +39,6 @@ GND              →         GND
 SDA              →         GPIO6
 SCL              →         GPIO7
 AD0              →         GND     (I2C address: 0x68)
-INT              →         GPIO4   (optional)
 
 SSD1306 OLED               ESP32-C3
 ─────────────────          ─────────
@@ -45,28 +46,45 @@ VCC              →         3.3V
 GND              →         GND
 SDA              →         GPIO6   (shared I2C bus)
 SCL              →         GPIO7   (shared I2C bus)
+
+Calibration Button         ESP32-C3
+──────────────────         ─────────
+Terminal 1       →         GPIO3
+Terminal 2       →         GND
+(internal pull-up enabled — no resistor needed)
 ```
 
-### Satellite Unit
+### Satellite Display Unit
 ```
-MPU-6050 (GY-521)          ESP32-C3
+SSD1306 OLED               ESP32-C3
 ─────────────────          ─────────
 VCC              →         3.3V
 GND              →         GND
 SDA              →         GPIO6
 SCL              →         GPIO7
-AD0              →         GND
 ```
 
 ---
 
 ## Usage Modes
 
-| Mode | Hardware needed | Description |
-|------|----------------|-------------|
-| **Minimal** | Core unit + phone | Tent pitch/roll streamed over BLE to Flutter app |
-| **Standalone** | Core unit + OLED | No phone needed, angles shown on display |
-| **Full system** | Core + Satellite + phone | Compare tent vs car body, optimal leveling guidance |
+| Mode | Hardware | Description |
+|------|----------|-------------|
+| **Standalone** | Core unit | Angles on Core OLED, no phone needed |
+| **Phone** | Core + phone | Full bubble level UI via BLE app |
+| **Remote display** | Core + Satellite | Satellite OLED inside car/tent, Core on rack |
+
+---
+
+## Calibration
+
+The Core Unit calibrates automatically on every power-on. Place it on the tent mount before turning on for best results.
+
+To reset calibration at any time:
+- **Physical button:** Hold the button on the Core Unit for 1 second
+- **App:** Tap the **Recalibrate** button in the Flutter app
+
+During calibration the unit must be kept still for ~2 seconds.
 
 ---
 
@@ -75,10 +93,10 @@ AD0              →         GND
 ```
 inclinocar/
 ├── firmware/
-│   ├── core/           # ESP32 #1 — IMU + BLE + OLED + optional ESP-NOW
-│   └── satellite/      # ESP32 #2 — IMU + ESP-NOW transmitter only
+│   ├── core/           # ESP32 #1 — IMU + BLE + OLED + ESP-NOW TX + cal button
+│   └── satellite/      # ESP32 #2 — OLED display + ESP-NOW RX only
 ├── app/                # Flutter app (Android + iOS)
-├── docs/               # Architecture, BLE spec, wiring diagrams
+├── docs/               # GitHub Pages web installer + documentation
 └── README.md
 ```
 
@@ -89,28 +107,26 @@ inclinocar/
 | UUID | Type | Description |
 |------|------|-------------|
 | `4fafc201-1fb5-459e-8fcc-c5c9c331914b` | Service | InclinoCar primary service |
-| `beb5483e-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Pitch (float, degrees) |
-| `beb5483f-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Roll (float, degrees) |
-| `beb54840-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Satellite pitch (float, optional) |
-| `beb54841-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Satellite roll (float, optional) |
+| `beb5483e-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Pitch (float32, degrees, NOTIFY) |
+| `beb5483f-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Roll (float32, degrees, NOTIFY) |
+| `beb54842-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Calibrate (write 0x01 to reset) |
+| `beb54843-36e1-4688-b7f5-ea07361b26a8` | Characteristic | Status (NOTIFY: 0x01 = cal done) |
 
 ---
 
 ## Getting Started
 
-### Firmware
-1. Install [VS Code](https://code.visualstudio.com/) + [PlatformIO extension](https://platformio.org/install/ide?install=vscode)
-2. Open `firmware/core` or `firmware/satellite` as a PlatformIO project
-3. Connect your ESP32-C3 via USB
-4. Click **Upload** in PlatformIO
+### Flash Firmware
+Use the **[Web Installer](https://tophe75.github.io/inclinocar/)** — flash directly from Chrome or Edge, no drivers needed.
 
 ### App
-1. Install [Flutter SDK](https://flutter.dev/docs/get-started/install)
-2. `cd app && flutter pub get`
-3. `flutter run`
+```bash
+cd app
+flutter pub get
+flutter run
+```
 
 ---
 
 ## License
-
 MIT

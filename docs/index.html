@@ -34,7 +34,6 @@
       overflow-x: hidden;
     }
 
-    /* ── Grid texture overlay ── */
     body::before {
       content: '';
       position: fixed;
@@ -47,7 +46,6 @@
       z-index: 0;
     }
 
-    /* ── Glow orb ── */
     body::after {
       content: '';
       position: fixed;
@@ -67,11 +65,7 @@
       padding: 48px 24px 80px;
     }
 
-    /* ── Header ── */
-    header {
-      text-align: center;
-      margin-bottom: 56px;
-    }
+    header { text-align: center; margin-bottom: 48px; }
 
     .logo-mark {
       display: inline-flex;
@@ -118,7 +112,6 @@
       text-transform: uppercase;
     }
 
-    /* ── Version badge ── */
     #version-badge {
       display: inline-flex;
       align-items: center;
@@ -131,28 +124,58 @@
       font-size: 0.75rem;
       color: var(--text-dim);
     }
-    #version-badge .dot {
-      width: 6px; height: 6px;
-      border-radius: 50%;
-      background: var(--green-dim);
-    }
+    #version-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--green-dim); }
     #version-badge.loaded .dot { background: var(--green); }
 
-    /* ── Browser warning ── */
+    /* ── How it works ── */
+    .how-it-works {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 28px;
+    }
+    .hw-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+    }
+    .hw-card h3 {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.12em;
+      color: var(--green);
+      margin-bottom: 6px;
+    }
+    .hw-card p {
+      font-size: 0.78rem;
+      color: var(--text-dim);
+      line-height: 1.6;
+    }
+    .hw-card .chip {
+      display: inline-block;
+      font-family: var(--mono);
+      font-size: 0.68rem;
+      color: var(--amber);
+      border: 1px solid rgba(240,165,0,0.3);
+      border-radius: 3px;
+      padding: 1px 5px;
+      margin-bottom: 6px;
+    }
+
     #browser-warning {
       display: none;
       background: rgba(224,80,80,0.08);
       border: 1px solid rgba(224,80,80,0.4);
       border-radius: 8px;
       padding: 16px 20px;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
       font-size: 0.875rem;
       color: #ef9a9a;
       line-height: 1.6;
     }
     #browser-warning strong { color: var(--red); }
 
-    /* ── Cards ── */
     .card {
       background: var(--bg2);
       border: 1px solid var(--border);
@@ -160,10 +183,19 @@
       padding: 28px 32px;
       margin-bottom: 16px;
       transition: border-color 0.3s;
+      animation: fadeIn 0.4s ease both;
     }
+    .card:nth-child(2) { animation-delay: 0.07s; }
+    .card:nth-child(3) { animation-delay: 0.14s; }
+    .card:nth-child(4) { animation-delay: 0.21s; }
     .card.active  { border-color: var(--green-dim); }
     .card.success { border-color: var(--green); background: rgba(61,220,92,0.04); }
     .card.error   { border-color: var(--red);   background: rgba(224,80,80,0.04); }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
 
     .card-header {
       display: flex;
@@ -182,35 +214,15 @@
     }
     .card.active  .step-num { border-color: var(--green-dim); color: var(--green); }
     .card.success .step-num { border-color: var(--green); color: var(--green); }
-
-    .card-header h2 {
-      font-size: 1rem;
-      font-weight: 600;
-      letter-spacing: 0.06em;
-      color: var(--text);
-    }
-    .card-header .status-icon {
-      margin-left: auto;
-      font-size: 1.1rem;
-    }
-
-    .card p {
-      font-size: 0.875rem;
-      color: var(--text-dim);
-      line-height: 1.7;
-      margin-bottom: 16px;
-    }
+    .card-header h2 { font-size: 1rem; font-weight: 600; letter-spacing: 0.06em; color: var(--text); }
+    .card-header .status-icon { margin-left: auto; font-size: 1.1rem; }
+    .card p { font-size: 0.875rem; color: var(--text-dim); line-height: 1.7; margin-bottom: 16px; }
     .card p:last-child { margin-bottom: 0; }
 
-    /* ── Firmware selector ── */
-    .fw-tabs {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 20px;
-    }
+    .fw-tabs { display: flex; gap: 8px; margin-bottom: 20px; }
     .fw-tab {
       flex: 1;
-      padding: 10px 16px;
+      padding: 12px 16px;
       background: var(--bg3);
       border: 1px solid var(--border);
       border-radius: 6px;
@@ -219,18 +231,13 @@
       font-size: 0.875rem;
       color: var(--text-dim);
       transition: all 0.2s;
-      text-align: center;
+      text-align: left;
     }
     .fw-tab:hover { border-color: var(--green-dim); color: var(--text); }
-    .fw-tab.selected {
-      border-color: var(--green);
-      color: var(--green);
-      background: var(--green-lo);
-    }
-    .fw-tab .fw-label { font-weight: 600; display: block; margin-bottom: 2px; }
-    .fw-tab .fw-sub   { font-size: 0.75rem; opacity: 0.7; }
+    .fw-tab.selected { border-color: var(--green); color: var(--green); background: var(--green-lo); }
+    .fw-tab .fw-label { font-weight: 600; display: block; margin-bottom: 3px; }
+    .fw-tab .fw-sub   { font-size: 0.73rem; opacity: 0.7; line-height: 1.4; }
 
-    /* ── Buttons ── */
     .btn {
       display: inline-flex;
       align-items: center;
@@ -246,35 +253,13 @@
       text-decoration: none;
     }
     .btn:disabled { opacity: 0.35; cursor: not-allowed; pointer-events: none; }
-
-    .btn-primary {
-      background: var(--green-lo);
-      border-color: var(--green);
-      color: var(--green);
-    }
-    .btn-primary:hover {
-      background: rgba(61,220,92,0.15);
-      box-shadow: 0 0 16px rgba(61,220,92,0.2);
-    }
-    .btn-secondary {
-      background: transparent;
-      border-color: var(--border);
-      color: var(--text-dim);
-    }
+    .btn-primary { background: var(--green-lo); border-color: var(--green); color: var(--green); }
+    .btn-primary:hover { background: rgba(61,220,92,0.15); box-shadow: 0 0 16px rgba(61,220,92,0.2); }
+    .btn-secondary { background: transparent; border-color: var(--border); color: var(--text-dim); }
     .btn-secondary:hover { border-color: var(--green-dim); color: var(--text); }
+    .btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 20px; }
 
-    .btn-row {
-      display: flex;
-      gap: 10px;
-      flex-wrap: wrap;
-      margin-top: 20px;
-    }
-
-    /* ── Progress bar ── */
-    .progress-wrap {
-      margin-top: 20px;
-      display: none;
-    }
+    .progress-wrap { margin-top: 20px; display: none; }
     .progress-wrap.visible { display: block; }
     .progress-label {
       display: flex;
@@ -284,12 +269,7 @@
       color: var(--text-dim);
       margin-bottom: 6px;
     }
-    .progress-track {
-      height: 4px;
-      background: var(--bg3);
-      border-radius: 2px;
-      overflow: hidden;
-    }
+    .progress-track { height: 4px; background: var(--bg3); border-radius: 2px; overflow: hidden; }
     .progress-fill {
       height: 100%;
       background: linear-gradient(90deg, var(--green-dim), var(--green));
@@ -299,7 +279,6 @@
       box-shadow: 0 0 8px rgba(61,220,92,0.4);
     }
 
-    /* ── Log console ── */
     .log-console {
       margin-top: 16px;
       background: var(--bg);
@@ -315,16 +294,12 @@
     }
     .log-console.visible { display: block; }
     .log-line { color: var(--text-dim); }
-    .log-line.ok     { color: var(--green); }
-    .log-line.warn   { color: var(--amber); }
-    .log-line.error  { color: var(--red); }
+    .log-line.ok    { color: var(--green); }
+    .log-line.warn  { color: var(--amber); }
+    .log-line.error { color: var(--red); }
     .log-line::before { content: '> '; opacity: 0.4; }
 
-    /* ── Binary list ── */
-    .bin-list {
-      list-style: none;
-      margin-top: 12px;
-    }
+    .bin-list { list-style: none; margin-top: 12px; }
     .bin-list li {
       display: flex;
       align-items: center;
@@ -336,15 +311,10 @@
       color: var(--text-dim);
     }
     .bin-list li:last-child { border-bottom: none; }
-    .bin-offset {
-      color: var(--amber);
-      flex-shrink: 0;
-      width: 70px;
-    }
-    .bin-name { flex: 1; }
+    .bin-offset { color: var(--amber); flex-shrink: 0; width: 70px; }
+    .bin-name   { flex: 1; }
     .bin-status { flex-shrink: 0; font-size: 0.85rem; }
 
-    /* ── Info box ── */
     .info-box {
       background: var(--bg3);
       border: 1px solid var(--border);
@@ -358,7 +328,6 @@
     }
     .info-box strong { color: var(--text); }
 
-    /* ── Footer ── */
     footer {
       text-align: center;
       padding-top: 40px;
@@ -369,19 +338,7 @@
     }
     footer a { color: var(--text-dim); }
 
-    /* ── Animations ── */
-    @keyframes fadeIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to   { opacity: 1; transform: translateY(0); }
-    }
-    .card { animation: fadeIn 0.4s ease both; }
-    .card:nth-child(2) { animation-delay: 0.07s; }
-    .card:nth-child(3) { animation-delay: 0.14s; }
-    .card:nth-child(4) { animation-delay: 0.21s; }
-
-    @keyframes spin {
-      to { transform: rotate(360deg); }
-    }
+    @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
       display: inline-block;
       width: 14px; height: 14px;
@@ -395,7 +352,6 @@
 <body>
 <main>
 
-  <!-- Header -->
   <header>
     <div class="logo-mark"><div class="logo-bubble"></div></div>
     <h1>INCLINOCAR</h1>
@@ -406,11 +362,24 @@
     </div>
   </header>
 
-  <!-- Browser check -->
+  <!-- How it works -->
+  <div class="how-it-works">
+    <div class="hw-card">
+      <span class="chip">ESP32 #1</span>
+      <h3>Core Unit</h3>
+      <p>Mounts on the roof rack or tent. Reads pitch &amp; roll, shows angles on its OLED, streams data over BLE to the phone and via ESP-NOW to the Satellite Display.</p>
+    </div>
+    <div class="hw-card">
+      <span class="chip">ESP32 #2</span>
+      <h3>Satellite Display</h3>
+      <p>Optional remote display unit. Place it inside the car or tent. Receives angle data from the Core Unit via ESP-NOW — no IMU, no phone needed.</p>
+    </div>
+  </div>
+
   <div id="browser-warning">
     <strong>Unsupported browser.</strong> This installer uses the Web Serial API which requires
     <strong>Chrome 89+</strong> or <strong>Edge 89+</strong> on desktop.
-    Firefox and Safari are not supported. Please switch browsers to continue.
+    Firefox and Safari are not supported.
   </div>
 
   <!-- Step 1: Select firmware -->
@@ -419,28 +388,26 @@
       <span class="step-num">01</span>
       <h2>Select Firmware</h2>
     </div>
-    <p>Choose which ESP32-C3 unit you are flashing. Flash the <strong>Core Unit</strong> first — it must be running before the Satellite can pair.</p>
+    <p>Choose which unit you are flashing. Always flash the <strong>Core Unit</strong> first.</p>
 
     <div class="fw-tabs">
       <div class="fw-tab selected" id="tab-core" onclick="selectFirmware('core')">
-        <span class="fw-label">Core Unit</span>
-        <span class="fw-sub">ESP32 #1 · IMU + BLE + OLED</span>
+        <span class="fw-label">Core Unit — ESP32 #1</span>
+        <span class="fw-sub">MPU-6050 IMU · OLED display · BLE · ESP-NOW TX · Cal button</span>
       </div>
       <div class="fw-tab" id="tab-satellite" onclick="selectFirmware('satellite')">
-        <span class="fw-label">Satellite Unit</span>
-        <span class="fw-sub">ESP32 #2 · IMU + ESP-NOW</span>
+        <span class="fw-label">Satellite Display — ESP32 #2</span>
+        <span class="fw-sub">OLED display only · ESP-NOW RX · No IMU · No BLE</span>
       </div>
     </div>
 
     <div class="info-box" id="fw-info">
-      <strong>Core Unit</strong> — measures tent pitch &amp; roll, serves BLE to the phone,
-      drives the OLED display, and optionally receives satellite data via ESP-NOW.
+      <strong>Core Unit</strong> — the main sensor node. Measures tent pitch &amp; roll, displays angles locally on its OLED, broadcasts over BLE to the phone app, and sends data to the Satellite Display via ESP-NOW. Hold the calibration button for 1 second to reset the level reference.
     </div>
 
-    <!-- Binary list -->
     <ul class="bin-list" id="bin-list">
-      <li><span class="bin-offset">0x0000</span><span class="bin-name">bootloader.bin</span><span class="bin-status" id="bs-0">⏳</span></li>
-      <li><span class="bin-offset">0x8000</span><span class="bin-name">partitions.bin</span><span class="bin-status" id="bs-1">⏳</span></li>
+      <li><span class="bin-offset">0x00000</span><span class="bin-name">bootloader.bin</span><span class="bin-status" id="bs-0">⏳</span></li>
+      <li><span class="bin-offset">0x08000</span><span class="bin-name">partitions.bin</span><span class="bin-status" id="bs-1">⏳</span></li>
       <li><span class="bin-offset">0x10000</span><span class="bin-name">firmware.bin</span><span class="bin-status" id="bs-2">⏳</span></li>
     </ul>
 
@@ -460,7 +427,7 @@
     </div>
     <p>Hold the <strong>BOOT</strong> button on the ESP32-C3, plug in USB, then release BOOT. Click connect and select the correct COM port.</p>
     <div class="info-box">
-      <strong>Windows:</strong> Look for <em>USB Serial (COMx)</em> or <em>CP210x</em> · 
+      <strong>Windows:</strong> Look for <em>USB Serial Device (COMx)</em> or <em>CP210x</em><br>
       <strong>Mac/Linux:</strong> Look for <em>/dev/tty.usbserial-*</em> or <em>/dev/ttyUSB*</em>
     </div>
     <div class="btn-row">
@@ -508,7 +475,7 @@
       <h2>Done</h2>
       <span class="status-icon">✓</span>
     </div>
-    <p id="done-msg">Firmware flashed successfully.</p>
+    <p id="done-msg"></p>
     <div class="btn-row">
       <button class="btn btn-primary" onclick="flashAnother()">Flash Another Unit</button>
       <a class="btn btn-secondary" href="https://github.com/tophe75/inclinocar" target="_blank">View on GitHub ↗</a>
@@ -516,52 +483,43 @@
   </div>
 
   <footer>
-    InclinoCar &nbsp;·&nbsp; <a href="https://github.com/tophe75/inclinocar" target="_blank">github.com/tophe75/inclinocar</a>
+    InclinoCar &nbsp;·&nbsp;
+    <a href="https://github.com/tophe75/inclinocar" target="_blank">github.com/tophe75/inclinocar</a>
     &nbsp;·&nbsp; Web Serial requires Chrome / Edge
   </footer>
 
 </main>
 
 <script>
-// ─────────────────────────────────────────────────────────────
-//  Config
-// ─────────────────────────────────────────────────────────────
 const GITHUB_REPO = 'tophe75/inclinocar';
 const RELEASE_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
 
 const FW_INFO = {
   core: {
-    label: 'Core Unit',
-    desc: '<strong>Core Unit</strong> — measures tent pitch &amp; roll, serves BLE to the phone, drives the OLED display, and optionally receives satellite data via ESP-NOW.',
+    info: '<strong>Core Unit</strong> — the main sensor node. Measures tent pitch &amp; roll, displays angles locally on its OLED, broadcasts over BLE to the phone app, and sends data to the Satellite Display via ESP-NOW. Hold the calibration button for 1 second to reset the level reference.',
     files: [
-      { offset: 0x0000,  name: 'core-bootloader.bin'  },
-      { offset: 0x8000,  name: 'core-partitions.bin'  },
+      { offset: 0x00000, name: 'core-bootloader.bin'  },
+      { offset: 0x08000, name: 'core-partitions.bin'  },
       { offset: 0x10000, name: 'core-firmware.bin'    },
-    ]
+    ],
+    done: 'Core Unit flashed successfully. Wire up the MPU-6050, OLED, and calibration button, then power on. The unit calibrates automatically on boot — keep it still for 2 seconds. You can now connect the phone app or flash the Satellite Display unit.'
   },
   satellite: {
-    label: 'Satellite Unit',
-    desc: '<strong>Satellite Unit</strong> — measures car body pitch &amp; roll and transmits to the Core Unit via ESP-NOW. No BLE, no display.',
+    info: '<strong>Satellite Display Unit</strong> — a remote OLED display. Place it anywhere convenient in the car or inside the tent. It receives angle data wirelessly from the Core Unit via ESP-NOW. No IMU, no phone required.',
     files: [
-      { offset: 0x0000,  name: 'satellite-bootloader.bin'  },
-      { offset: 0x8000,  name: 'satellite-partitions.bin'  },
+      { offset: 0x00000, name: 'satellite-bootloader.bin'  },
+      { offset: 0x08000, name: 'satellite-partitions.bin'  },
       { offset: 0x10000, name: 'satellite-firmware.bin'    },
-    ]
+    ],
+    done: 'Satellite Display flashed successfully. Wire up the OLED display, then power on. It will show "Waiting for Core…" until the Core Unit is powered on nearby — they pair automatically via ESP-NOW.'
   }
 };
 
-// ─────────────────────────────────────────────────────────────
-//  State
-// ─────────────────────────────────────────────────────────────
-let selectedFw    = 'core';
-let releaseTag    = null;
-let binaries      = [];   // [{offset, data: Uint8Array}]
-let serialPort    = null;
-let isConnected   = false;
+let selectedFw  = 'core';
+let releaseTag  = null;
+let binaries    = [];
+let serialPort  = null;
 
-// ─────────────────────────────────────────────────────────────
-//  Init
-// ─────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   if (!('serial' in navigator)) {
     document.getElementById('browser-warning').style.display = 'block';
@@ -582,14 +540,11 @@ async function fetchReleaseInfo() {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Firmware selection
-// ─────────────────────────────────────────────────────────────
 function selectFirmware(fw) {
   selectedFw = fw;
   document.getElementById('tab-core').classList.toggle('selected', fw === 'core');
   document.getElementById('tab-satellite').classList.toggle('selected', fw === 'satellite');
-  document.getElementById('fw-info').innerHTML = FW_INFO[fw].desc;
+  document.getElementById('fw-info').innerHTML = FW_INFO[fw].info;
   updateBinList();
   binaries = [];
   document.getElementById('btn-connect').disabled = true;
@@ -602,20 +557,15 @@ function updateBinList() {
   const items = document.querySelectorAll('#bin-list li');
   items.forEach((li, i) => {
     li.querySelector('.bin-offset').textContent = '0x' + files[i].offset.toString(16).toUpperCase().padStart(5,'0');
-    li.querySelector('.bin-name').textContent    = files[i].name;
-    li.querySelector('.bin-status').textContent  = '⏳';
+    li.querySelector('.bin-name').textContent   = files[i].name;
+    li.querySelector('.bin-status').textContent = '⏳';
   });
 }
 
 function resetBinStatuses() {
-  [0,1,2].forEach(i => {
-    document.getElementById(`bs-${i}`).textContent = '⏳';
-  });
+  [0,1,2].forEach(i => document.getElementById(`bs-${i}`).textContent = '⏳');
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Fetch binaries from GitHub Releases
-// ─────────────────────────────────────────────────────────────
 async function fetchBinaries() {
   const btn = document.getElementById('btn-fetch');
   btn.disabled = true;
@@ -624,24 +574,22 @@ async function fetchBinaries() {
   resetBinStatuses();
 
   try {
-    const res   = await fetch(RELEASE_API);
-    const data  = await res.json();
-    releaseTag  = data.tag_name;
+    const res    = await fetch(RELEASE_API);
+    const data   = await res.json();
+    releaseTag   = data.tag_name;
     const assets = data.assets || [];
+    const files  = FW_INFO[selectedFw].files;
 
-    const files = FW_INFO[selectedFw].files;
     for (let i = 0; i < files.length; i++) {
       const f     = files[i];
       const asset = assets.find(a => a.name === f.name);
-
       if (!asset) {
         document.getElementById(`bs-${i}`).textContent = '✗';
-        throw new Error(`Binary not found in release: ${f.name}\n\nMake sure you have published a GitHub Release with this file attached.`);
+        throw new Error(`Binary not found in release: ${f.name}\n\nMake sure the CI build has completed and published a release with this file attached.`);
       }
-
       document.getElementById(`bs-${i}`).textContent = '↓';
-      const binRes  = await fetch(asset.browser_download_url);
-      const buffer  = await binRes.arrayBuffer();
+      const binRes = await fetch(asset.browser_download_url);
+      const buffer = await binRes.arrayBuffer();
       binaries.push({ offset: f.offset, data: new Uint8Array(buffer) });
       document.getElementById(`bs-${i}`).textContent = '✓';
     }
@@ -657,14 +605,10 @@ async function fetchBinaries() {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Serial connection
-// ─────────────────────────────────────────────────────────────
 async function connectSerial() {
   try {
     serialPort = await navigator.serial.requestPort();
     await serialPort.open({ baudRate: 115200 });
-    isConnected = true;
 
     document.getElementById('connect-icon').textContent = '✓';
     document.getElementById('card-connect').classList.add('success');
@@ -672,28 +616,20 @@ async function connectSerial() {
     document.getElementById('btn-connect').disabled = true;
     document.getElementById('btn-flash').disabled = false;
     document.getElementById('card-flash').classList.add('active');
-
-    log('Serial port opened at 115200 baud', 'ok');
+    log('Serial port opened', 'ok');
   } catch (e) {
-    if (e.name !== 'NotFoundError') {
-      log('Serial error: ' + e.message, 'error');
-    }
+    if (e.name !== 'NotFoundError') log('Serial error: ' + e.message, 'error');
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Flash using esptool.js (ESPLoader)
-// ─────────────────────────────────────────────────────────────
 async function startFlash() {
   document.getElementById('btn-flash').disabled = true;
   document.getElementById('progress-wrap').classList.add('visible');
   document.getElementById('log-console').classList.add('visible');
-  document.getElementById('card-flash').classList.add('active');
 
-  log(`Flashing ${FW_INFO[selectedFw].label} — release ${releaseTag}`);
+  log(`Flashing ${selectedFw === 'core' ? 'Core Unit' : 'Satellite Display'} — release ${releaseTag}`);
 
   try {
-    // Dynamically load esptool.js from CDN
     if (!window.esptoolModule) {
       log('Loading esptool.js…');
       await loadScript('https://unpkg.com/esptool-js@0.4.3/bundle.js');
@@ -703,16 +639,14 @@ async function startFlash() {
     const { ESPLoader, Transport } = window.esptoolModule || window;
 
     setProgress('Connecting to chip…', 5);
-    log('Entering bootloader mode…');
-
     const transport = new Transport(serialPort, true);
     const loader = new ESPLoader({
       transport,
       baudrate: 460800,
       terminal: {
-        clean()       {},
-        writeLine(s)  { log(s); },
-        write(s)      { /* partial lines — ignore */ },
+        clean()      {},
+        writeLine(s) { log(s); },
+        write(s)     {},
       },
     });
 
@@ -720,14 +654,12 @@ async function startFlash() {
     log(`Chip detected: ${chip}`, 'ok');
     setProgress(`Chip: ${chip}`, 15);
 
-    // Build flash file list
     const flashFiles = binaries.map(b => ({
       data:    Array.from(b.data).map(v => String.fromCharCode(v)).join(''),
       address: b.offset,
     }));
 
     setProgress('Erasing flash…', 25);
-    log('Erasing flash regions…');
 
     await loader.writeFlash({
       fileArray: flashFiles,
@@ -739,33 +671,22 @@ async function startFlash() {
       reportProgress(fileIndex, written, total) {
         const base  = 25 + fileIndex * 25;
         const share = Math.round((written / total) * 25);
-        const pct   = Math.min(base + share, 99);
         const names = FW_INFO[selectedFw].files;
-        setProgress(`Writing ${names[fileIndex].name}…`, pct);
+        setProgress(`Writing ${names[fileIndex].name}…`, Math.min(base + share, 99));
       },
-      calculateMD5Hash(image) {
-        // MD5 not critical for verification here — return empty
-        return '';
-      },
+      calculateMD5Hash() { return ''; },
     });
 
     setProgress('Resetting device…', 99);
-    log('Resetting ESP32…');
     await loader.hardReset();
     await transport.disconnect();
-
     setProgress('Done!', 100);
-    log(`✓ ${FW_INFO[selectedFw].label} flashed successfully`, 'ok');
+    log(`✓ Flash complete`, 'ok');
 
-    // Show done card
     document.getElementById('card-flash').classList.add('success');
     document.getElementById('flash-icon').textContent = '✓';
     document.getElementById('card-done').style.display = 'block';
-
-    const doneMsg = selectedFw === 'core'
-      ? 'Core Unit is ready. You can now connect the OLED and MPU-6050, then open the InclinoCar app on your phone.'
-      : 'Satellite Unit is ready. Power on the Core Unit first, then the Satellite — they will pair automatically via ESP-NOW.';
-    document.getElementById('done-msg').textContent = doneMsg;
+    document.getElementById('done-msg').textContent = FW_INFO[selectedFw].done;
     document.getElementById('btn-reset').style.display = 'inline-flex';
 
   } catch (e) {
@@ -777,9 +698,6 @@ async function startFlash() {
   }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  Helpers
-// ─────────────────────────────────────────────────────────────
 function setProgress(label, pct) {
   document.getElementById('progress-stage').textContent = label;
   document.getElementById('progress-pct').textContent   = pct + '%';
@@ -806,27 +724,22 @@ function loadScript(src) {
   });
 }
 
-function resetAll() {
-  location.reload();
-}
+function resetAll() { location.reload(); }
 
 function flashAnother() {
-  // Keep binaries, restart from connect step
-  isConnected = false;
-  serialPort  = null;
-
+  serialPort = null;
   document.getElementById('card-connect').classList.remove('success');
   document.getElementById('connect-icon').textContent = '○';
-  document.getElementById('btn-connect').innerHTML = '⚡ Connect Serial Port';
-  document.getElementById('btn-connect').disabled  = false;
-  document.getElementById('btn-flash').disabled    = true;
-  document.getElementById('card-done').style.display = 'none';
+  document.getElementById('btn-connect').innerHTML    = '⚡ Connect Serial Port';
+  document.getElementById('btn-connect').disabled     = false;
+  document.getElementById('btn-flash').disabled       = true;
+  document.getElementById('card-done').style.display  = 'none';
   document.getElementById('card-flash').classList.remove('success', 'error');
-  document.getElementById('flash-icon').textContent = '○';
+  document.getElementById('flash-icon').textContent   = '○';
   document.getElementById('progress-wrap').classList.remove('visible');
   document.getElementById('log-console').classList.remove('visible');
-  document.getElementById('log-console').innerHTML = '';
-  document.getElementById('btn-reset').style.display = 'none';
+  document.getElementById('log-console').innerHTML    = '';
+  document.getElementById('btn-reset').style.display  = 'none';
   setProgress('Initializing…', 0);
 }
 </script>
