@@ -652,10 +652,16 @@ async function startFlash() {
     log(`Chip detected: ${chip}`, 'ok');
     setProgress(`Chip: ${chip}`, 15);
 
-    const flashFiles = binaries.map(b => ({
-      data:    Array.from(b.data).map(v => String.fromCharCode(v)).join(''),
-      address: b.offset,
-    }));
+    // Convert Uint8Array to binary string safely using TextDecoder workaround
+    // String.fromCharCode spread fails on large arrays; use chunks instead
+    const flashFiles = binaries.map(b => {
+      const CHUNK = 0x8000;
+      let binary = '';
+      for (let i = 0; i < b.data.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(null, b.data.subarray(i, i + CHUNK));
+      }
+      return { data: binary, address: b.offset };
+    });
 
     setProgress('Erasing flash…', 25);
 
