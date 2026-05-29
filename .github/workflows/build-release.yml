@@ -6,6 +6,9 @@ on:
       - 'v*'
   workflow_dispatch:
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-firmware:
     name: Build ESP32 Firmware (${{ matrix.unit }})
@@ -23,22 +26,16 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Cache PlatformIO
         uses: actions/cache@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           path: ~/.platformio
           key: platformio-${{ runner.os }}-${{ hashFiles(format('{0}/platformio.ini', matrix.project)) }}
           restore-keys: platformio-${{ runner.os }}-
 
       - name: Install PlatformIO
-        run: |
-          pip install platformio
-          pio --version
+        run: pip install platformio && pio --version
 
       - name: Build ${{ matrix.unit }} firmware
         working-directory: ${{ matrix.project }}
@@ -47,24 +44,21 @@ jobs:
       - name: Collect binaries
         run: |
           mkdir -p dist/${{ matrix.unit }}
-          BUILD=.pio/build/esp32-c3-devkitm-1
-          cp ${{ matrix.project }}/${BUILD}/bootloader.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-bootloader.bin
-          cp ${{ matrix.project }}/${BUILD}/partitions.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-partitions.bin
-          cp ${{ matrix.project }}/${BUILD}/firmware.bin    dist/${{ matrix.unit }}/${{ matrix.unit }}-firmware.bin
-          echo "--- Built binaries ---"
+          BUILD=${{ matrix.project }}/.pio/build/esp32-c3-devkitm-1
+          cp ${BUILD}/bootloader.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-bootloader.bin
+          cp ${BUILD}/partitions.bin  dist/${{ matrix.unit }}/${{ matrix.unit }}-partitions.bin
+          cp ${BUILD}/firmware.bin    dist/${{ matrix.unit }}/${{ matrix.unit }}-firmware.bin
           ls -lh dist/${{ matrix.unit }}/
 
       - name: Upload build artifacts
         uses: actions/upload-artifact@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           name: firmware-${{ matrix.unit }}
           path: dist/${{ matrix.unit }}/
           retention-days: 7
 
-  release:
-    name: Publish GitHub Release
+  publish:
+    name: Publish Release & Update Web Installer
     needs: build-firmware
     runs-on: ubuntu-latest
     permissions:
@@ -73,27 +67,20 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+        with:
+          ref: main
 
       - name: Download core artifacts
         uses: actions/download-artifact@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           name: firmware-core
           path: dist/core/
 
       - name: Download satellite artifacts
         uses: actions/download-artifact@v4
-        env:
-          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           name: firmware-satellite
           path: dist/satellite/
-
-      - name: List release assets
-        run: ls -lh dist/core/ dist/satellite/
 
       - name: Determine release tag
         id: tag
@@ -103,6 +90,26 @@ jobs:
           else
             echo "tag=dev-$(date +'%Y%m%d-%H%M%S')" >> $GITHUB_OUTPUT
           fi
+
+      - name: Copy binaries into docs/bins for GitHub Pages
+        run: |
+          mkdir -p docs/bins
+          cp dist/core/core-bootloader.bin            docs/bins/
+          cp dist/core/core-partitions.bin            docs/bins/
+          cp dist/core/core-firmware.bin              docs/bins/
+          cp dist/satellite/satellite-bootloader.bin  docs/bins/
+          cp dist/satellite/satellite-partitions.bin  docs/bins/
+          cp dist/satellite/satellite-firmware.bin    docs/bins/
+          echo "${{ steps.tag.outputs.tag }}" > docs/bins/version.txt
+          ls -lh docs/bins/
+
+      - name: Commit binaries to main branch
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/bins/
+          git diff --staged --quiet || git commit -m "ci: update firmware bins to ${{ steps.tag.outputs.tag }}"
+          git push origin main
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -114,33 +121,22 @@ jobs:
           body: |
             ## InclinoCar Firmware ${{ steps.tag.outputs.tag }}
 
-            ### Flashing
-            Use the **[Web Installer](https://tophe75.github.io/inclinocar/)** to flash directly from your browser (Chrome/Edge only).
+            Flash using the **[Web Installer](https://tophe75.github.io/inclinocar/)** — works directly in Chrome/Edge, no drivers needed.
 
             Or flash manually with esptool:
             ```bash
             # Core Unit
             esptool.py --chip esp32c3 write_flash \
-              0x0000  core-bootloader.bin \
-              0x8000  core-partitions.bin \
+              0x00000 core-bootloader.bin \
+              0x08000 core-partitions.bin \
               0x10000 core-firmware.bin
 
-            # Satellite Unit
+            # Satellite Display Unit
             esptool.py --chip esp32c3 write_flash \
-              0x0000  satellite-bootloader.bin \
-              0x8000  satellite-partitions.bin \
+              0x00000 satellite-bootloader.bin \
+              0x08000 satellite-partitions.bin \
               0x10000 satellite-firmware.bin
             ```
-
-            ### Assets
-            | File | Unit | Offset |
-            |------|------|--------|
-            | `core-bootloader.bin`       | Core      | 0x00000 |
-            | `core-partitions.bin`       | Core      | 0x08000 |
-            | `core-firmware.bin`         | Core      | 0x10000 |
-            | `satellite-bootloader.bin`  | Satellite | 0x00000 |
-            | `satellite-partitions.bin`  | Satellite | 0x08000 |
-            | `satellite-firmware.bin`    | Satellite | 0x10000 |
           files: |
             dist/core/core-bootloader.bin
             dist/core/core-partitions.bin

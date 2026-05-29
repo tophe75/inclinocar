@@ -492,7 +492,8 @@
 
 <script>
 const GITHUB_REPO = 'tophe75/inclinocar';
-const RELEASE_API = `https://api.github.com/repos/${GITHUB_REPO}/releases/latest`;
+// Binaries are served from the same GitHub Pages origin — no CORS issues
+const BINS_BASE = './bins';
 
 const FW_INFO = {
   core: {
@@ -529,14 +530,14 @@ window.addEventListener('DOMContentLoaded', () => {
 
 async function fetchReleaseInfo() {
   try {
-    const res  = await fetch(RELEASE_API);
-    const data = await res.json();
-    releaseTag = data.tag_name || 'unknown';
+    const res  = await fetch(`${BINS_BASE}/version.txt`);
+    const tag  = (await res.text()).trim();
+    releaseTag = tag;
     const badge = document.getElementById('version-badge');
     badge.classList.add('loaded');
     document.getElementById('version-text').textContent = `Latest release: ${releaseTag}`;
   } catch (e) {
-    document.getElementById('version-text').textContent = 'Could not fetch release info';
+    document.getElementById('version-text').textContent = 'Could not fetch version info';
   }
 }
 
@@ -574,24 +575,14 @@ async function fetchBinaries() {
   resetBinStatuses();
 
   try {
-    const res    = await fetch(RELEASE_API);
-    const data   = await res.json();
-    releaseTag   = data.tag_name;
-    const assets = data.assets || [];
-    const files  = FW_INFO[selectedFw].files;
+    const files = FW_INFO[selectedFw].files;
 
     for (let i = 0; i < files.length; i++) {
-      const f     = files[i];
-      const asset = assets.find(a => a.name === f.name);
-      if (!asset) {
-        document.getElementById(`bs-${i}`).textContent = '✗';
-        throw new Error(`Binary not found in release: ${f.name}\n\nMake sure the CI build has completed and published a release with this file attached.`);
-      }
+      const f      = files[i];
+      const url    = `${BINS_BASE}/${f.name}`;
       document.getElementById(`bs-${i}`).textContent = '↓';
-      // Route through CORS proxy — GitHub release assets block direct browser downloads
-      const proxyUrl = `https://corsproxy.io/?url=${encodeURIComponent(asset.browser_download_url)}`;
-      const binRes = await fetch(proxyUrl);
-      if (!binRes.ok) throw new Error(`Download failed for ${f.name}: HTTP ${binRes.status}`);
+      const binRes = await fetch(url);
+      if (!binRes.ok) throw new Error(`Could not load ${f.name} (HTTP ${binRes.status})\n\nHas the CI build run yet for this release?`);
       const buffer = await binRes.arrayBuffer();
       binaries.push({ offset: f.offset, data: new Uint8Array(buffer) });
       document.getElementById(`bs-${i}`).textContent = '✓';
