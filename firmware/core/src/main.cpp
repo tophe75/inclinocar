@@ -57,6 +57,11 @@ unsigned long lastSensorTime = 0;
 
 // ESP-NOW
 struct CoreData { float pitch; float roll; bool isCalibrated; };
+
+// ─── Fake data override (set via serial commands) ────────────
+bool  fakeDataEnabled = false;
+float fakePitch       = 0.0f;
+float fakeRoll        = 0.0f;
 uint8_t broadcastAddr[] = ESPNOW_BROADCAST_ADDR;
 
 // ─── OLED helpers ────────────────────────────────────────────
@@ -413,7 +418,120 @@ void setup() {
 }
 
 // ─── Loop ────────────────────────────────────────────────────
+// ─── Serial command handler ──────────────────────────────────
+void handleSerial() {
+  if (!Serial.available()) return;
+
+  String line = Serial.readStringUntil('\n');
+  line.trim();
+  if (line.length() == 0) return;
+
+  Serial.println();
+
+  // ── help ──
+  if (line == "help") {
+    Serial.println("InclinoCar Serial Commands");
+    Serial.println("─────────────────────────────────────");
+    Serial.println("  help           This help text");
+    Serial.println("  status         System status summary");
+    Serial.println("  version        Firmware version");
+    Serial.println("  mac            Device MAC address");
+    Serial.println("  cal            Trigger calibration reset");
+    Serial.println("  pitch <val>    Inject fake pitch (e.g. pitch 5.2)");
+    Serial.println("  roll <val>     Inject fake roll  (e.g. roll -3.1)");
+    Serial.println("  fake off       Disable fake data, use real IMU");
+    Serial.println("  reboot         Reboot the ESP32");
+    Serial.println("─────────────────────────────────────");
+    return;
+  }
+
+  // ── version ──
+  if (line == "version") {
+    Serial.println("Firmware:  " FW_VERSION);
+    Serial.println("Device:    InclinoCar Core Unit");
+    return;
+  }
+
+  // ── mac ──
+  if (line == "mac") {
+    Serial.print("MAC: ");
+    Serial.println(WiFi.macAddress());
+    return;
+  }
+
+  // ── status ──
+  if (line == "status") {
+    Serial.println("─── System Status ───────────────────");
+#if USE_OLED
+    Serial.printf("  OLED:      %s (GPIO3/4)\n", oledOk   ? "OK" : "NOT FOUND");
+#else
+    Serial.println("  OLED:      disabled in build");
+#endif
+#if USE_IMU
+    Serial.printf("  IMU:       %s (GPIO6/7)\n", imuOk    ? "OK" : "NOT FOUND");
+    Serial.printf("  Calibrated:%s\n",            isCalibrated ? "YES" : "NO");
+    if (isCalibrated) {
+      Serial.printf("  Offsets:   pitch=%.2f  roll=%.2f\n", calOffsetPitch, calOffsetRoll);
+    }
+    Serial.printf("  Pitch:     %+.2f deg\n", pitch);
+    Serial.printf("  Roll:      %+.2f deg\n", roll);
+#else
+    Serial.println("  IMU:       disabled in build");
+#endif
+    Serial.printf("  BLE:       %s\n",   bleConnected ? "connected" : "advertising");
+    Serial.printf("  Fake data: %s\n",   fakeDataEnabled ? "ON" : "off");
+    Serial.println("─────────────────────────────────────");
+    return;
+  }
+
+  // ── cal ──
+  if (line == "cal") {
+    Serial.println("[CMD] Calibration triggered");
+    calibratePending = true;
+    return;
+  }
+
+  // ── reboot ──
+  if (line == "reboot") {
+    Serial.println("[CMD] Rebooting...");
+    delay(200);
+    ESP.restart();
+    return;
+  }
+
+  // ── fake off ──
+  if (line == "fake off") {
+    fakeDataEnabled = false;
+    Serial.println("[CMD] Fake data disabled — using real IMU");
+    return;
+  }
+
+  // ── pitch <val> ──
+  if (line.startsWith("pitch ")) {
+    float val = line.substring(6).toFloat();
+    fakePitch       = val;
+    fakeDataEnabled = true;
+    pitch           = val;
+    Serial.printf("[CMD] Fake pitch set to %+.2f deg\n", val);
+    return;
+  }
+
+  // ── roll <val> ──
+  if (line.startsWith("roll ")) {
+    float val = line.substring(5).toFloat();
+    fakeRoll        = val;
+    fakeDataEnabled = true;
+    roll            = val;
+    Serial.printf("[CMD] Fake roll set to %+.2f deg\n", val);
+    return;
+  }
+
+  // ── unknown ──
+  Serial.printf("Unknown command: '%s'  (type 'help' for list)\n", line.c_str());
+}
+
 void loop() {
+  handleSerial();
   handleButton();
 
   if (calibratePending) {
@@ -426,7 +544,12 @@ void loop() {
     lastUpdate = now;
 
 #if USE_IMU
-    if (imuOk && isCalibrated) {
+    if (fakeDataEnabled) {
+      // Use injected values — good for testing display/BLE without IMU
+      pitch = fakePitch;
+      roll  = fakeRoll;
+      isCalibrated = true;
+    } else if (imuOk && isCalibrated) {
       updateIMU();
 
       if (bleConnected) {
