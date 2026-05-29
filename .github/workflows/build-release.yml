@@ -43,11 +43,18 @@ jobs:
             echo "tag=dev" >> $GITHUB_OUTPUT
           fi
 
+      - name: Inject version into platformio.ini
+        run: |
+          TAG="${{ steps.ver.outputs.tag }}"
+          INI="${{ matrix.project }}/platformio.ini"
+          # Replace the FW_VERSION flag in-place with the actual git tag
+          sed -i "s/-DFW_VERSION=\\"[^\"]*\"/-DFW_VERSION=\\"${TAG}\"/" "${INI}"
+          echo "Updated FW_VERSION to ${TAG} in ${INI}"
+          grep "FW_VERSION" "${INI}"
+
       - name: Build ${{ matrix.unit }} firmware
         working-directory: ${{ matrix.project }}
         run: pio run -v
-        env:
-          PLATFORMIO_BUILD_FLAGS: -DFW_VERSION=\"${{ steps.ver.outputs.tag }}\" 
 
       - name: Collect binaries
         run: |

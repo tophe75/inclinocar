@@ -770,9 +770,14 @@ async function startFlash() {
     });
 
     setProgress('Resetting device…', 99);
-    // Hard reset via RTS pin, then disconnect
-    await loader.after('hard_reset');
-    await transport.disconnect();
+    // ESP32-C3 native USB: trigger reset via stub, then disconnect
+    try {
+      await loader.after('hard_reset');
+    } catch (e) {
+      // Native USB may not support RTS reset — disconnect cleanly anyway
+      log('Note: RTS reset not available on native USB, unplug/replug to run firmware', 'warn');
+    }
+    try { await transport.disconnect(); } catch (e) {}
     setProgress('Done!', 100);
     log(`✓ Flash complete`, 'ok');
 
