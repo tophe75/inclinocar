@@ -427,8 +427,9 @@
     </div>
     <p>Hold the <strong>BOOT</strong> button on the ESP32-C3, plug in USB, then release BOOT. Click connect and select the correct COM port.</p>
     <div class="info-box">
-      <strong>Windows:</strong> Look for <em>USB Serial Device (COMx)</em> or <em>CP210x</em><br>
-      <strong>Mac/Linux:</strong> Look for <em>/dev/tty.usbserial-*</em> or <em>/dev/ttyUSB*</em>
+      <strong>ESP32-C3 built-in USB:</strong> Hold BOOT, plug in, release BOOT — shows as <em>USB Serial Device</em> (VID 303A)<br>
+      <strong>Windows:</strong> May need <a href="https://www.silabs.com/developer-tools/usb-to-uart-bridge-vcp-drivers" target="_blank" style="color:var(--green-dim)">CP210x drivers</a> for USB-UART adapter boards<br>
+      <strong>If the list is empty:</strong> The port dialog shows nothing if no serial device is detected — check USB cable and BOOT button sequence
     </div>
     <div class="btn-row">
       <button class="btn btn-primary" id="btn-connect" onclick="connectSerial()" disabled>
@@ -601,16 +602,21 @@ async function fetchBinaries() {
 
 async function connectSerial() {
   try {
+    // Show all serial ports — ESP32-C3 built-in USB: 0x303a/0x1001
+    // CP2102 (common USB-UART): 0x10c4/0xea60
+    // CH340: 0x1a86/0x7523
+    // No filters = show all ports so any USB-serial adapter works
     serialPort = await navigator.serial.requestPort();
     // Do NOT open the port — esptool-js opens and manages it internally
 
     document.getElementById('connect-icon').textContent = '✓';
     document.getElementById('card-connect').classList.add('success');
-    document.getElementById('btn-connect').innerHTML = '✓ Connected';
+    document.getElementById('btn-connect').innerHTML = '✓ Port Selected';
     document.getElementById('btn-connect').disabled = true;
     document.getElementById('btn-flash').disabled = false;
     document.getElementById('card-flash').classList.add('active');
-    log('Serial port selected — ready to flash', 'ok');
+    const info = serialPort.getInfo();
+    log(`Port selected — VendorID 0x${info.usbVendorId?.toString(16)} ProductID 0x${info.usbProductId?.toString(16)}`, 'ok');
   } catch (e) {
     if (e.name !== 'NotFoundError') log('Serial error: ' + e.message, 'error');
   }
