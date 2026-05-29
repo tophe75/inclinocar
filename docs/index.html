@@ -588,7 +588,12 @@ async function fetchBinaries() {
         throw new Error(`Binary not found in release: ${f.name}\n\nMake sure the CI build has completed and published a release with this file attached.`);
       }
       document.getElementById(`bs-${i}`).textContent = '↓';
-      const binRes = await fetch(asset.browser_download_url);
+      // Use the API download endpoint with Accept header to avoid CORS issues
+      const binRes = await fetch(
+        `https://api.github.com/repos/${GITHUB_REPO}/releases/assets/${asset.id}`,
+        { headers: { 'Accept': 'application/octet-stream' } }
+      );
+      if (!binRes.ok) throw new Error(`Download failed for ${f.name}: HTTP ${binRes.status}`);
       const buffer = await binRes.arrayBuffer();
       binaries.push({ offset: f.offset, data: new Uint8Array(buffer) });
       document.getElementById(`bs-${i}`).textContent = '✓';
