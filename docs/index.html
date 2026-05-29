@@ -602,7 +602,7 @@ async function fetchBinaries() {
 async function connectSerial() {
   try {
     serialPort = await navigator.serial.requestPort();
-    await serialPort.open({ baudRate: 115200 });
+    // Do NOT open the port — esptool-js opens and manages it internally
 
     document.getElementById('connect-icon').textContent = '✓';
     document.getElementById('card-connect').classList.add('success');
@@ -610,7 +610,7 @@ async function connectSerial() {
     document.getElementById('btn-connect').disabled = true;
     document.getElementById('btn-flash').disabled = false;
     document.getElementById('card-flash').classList.add('active');
-    log('Serial port opened', 'ok');
+    log('Serial port selected — ready to flash', 'ok');
   } catch (e) {
     if (e.name !== 'NotFoundError') log('Serial error: ' + e.message, 'error');
   }
