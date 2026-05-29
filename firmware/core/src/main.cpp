@@ -2,175 +2,139 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <esp_now.h>
-#include <Adafruit_MPU6050.h>
-#include <Adafruit_Sensor.h>
 #include <NimBLEDevice.h>
 #include "config.h"
 
 #if USE_OLED
   #include <Adafruit_SSD1306.h>
+  #include <Adafruit_GFX.h>
 #endif
 
-// ─── Globals ─────────────────────────────────────────────────
-Adafruit_MPU6050 mpu;
+#if USE_IMU
+  #include <Adafruit_MPU6050.h>
+  #include <Adafruit_Sensor.h>
+#endif
 
+// ─── I2C buses ───────────────────────────────────────────────
+TwoWire WireOLED = TwoWire(0);   // Bus 0 — display  (GPIO3/4)
+TwoWire WireIMU  = TwoWire(1);   // Bus 1 — MPU-6050 (GPIO6/7)
+
+// ─── Peripherals ─────────────────────────────────────────────
 #if USE_OLED
-  Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
+  Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &WireOLED, OLED_RESET);
+  bool oledOk = false;
 #endif
 
-NimBLEServer*         pServer       = nullptr;
-NimBLECharacteristic* pCharPitch    = nullptr;
-NimBLECharacteristic* pCharRoll     = nullptr;
-NimBLECharacteristic* pCharCalib    = nullptr;
-NimBLECharacteristic* pCharStatus   = nullptr;
+#if USE_IMU
+  Adafruit_MPU6050 mpu;
+  bool imuOk = false;
+#endif
 
-bool  bleConnected    = false;
-float pitch           = 0.0f;
-float roll            = 0.0f;
-float filteredPitch   = 0.0f;
-float filteredRoll    = 0.0f;
+// ─── BLE ─────────────────────────────────────────────────────
+NimBLEServer*         pServer     = nullptr;
+NimBLECharacteristic* pCharPitch  = nullptr;
+NimBLECharacteristic* pCharRoll   = nullptr;
+NimBLECharacteristic* pCharCalib  = nullptr;
+NimBLECharacteristic* pCharStatus = nullptr;
 
-// ─── Calibration ─────────────────────────────────────────────
+bool bleConnected = false;
+
+// ─── State ───────────────────────────────────────────────────
+float pitch         = 0.0f;
+float roll          = 0.0f;
+float filteredPitch = 0.0f;
+float filteredRoll  = 0.0f;
+
 float   calOffsetPitch  = 0.0f;
 float   calOffsetRoll   = 0.0f;
 bool    isCalibrated    = false;
 bool    calibratePending = false;
 
-// Button debounce
 unsigned long btnPressTime  = 0;
 bool          btnWasPressed = false;
-
-unsigned long lastUpdate     = 0;
+unsigned long lastUpdate    = 0;
 unsigned long lastSensorTime = 0;
 
-// ─── ESP-NOW packet ──────────────────────────────────────────
-struct CoreData {
-  float pitch;
-  float roll;
-  bool  isCalibrated;
-};
-
+// ESP-NOW
+struct CoreData { float pitch; float roll; bool isCalibrated; };
 uint8_t broadcastAddr[] = ESPNOW_BROADCAST_ADDR;
 
-// ─── BLE Callbacks ───────────────────────────────────────────
-class ServerCallbacks : public NimBLEServerCallbacks {
-  void onConnect(NimBLEServer* pSrv) override {
-    bleConnected = true;
-    Serial.println("[BLE] Client connected");
-  }
-  void onDisconnect(NimBLEServer* pSrv) override {
-    bleConnected = false;
-    Serial.println("[BLE] Client disconnected");
-    NimBLEDevice::startAdvertising();
-  }
-};
-
-// Write "1" to the calibrate characteristic to trigger reset
-class CalibWriteCallback : public NimBLECharacteristicCallbacks {
-  void onWrite(NimBLECharacteristic* pChar) override {
-    std::string val = pChar->getValue();
-    if (val.length() > 0 && val[0] == 0x01) {
-      calibratePending = true;
-      Serial.println("[BLE] Calibration reset requested via app");
-    }
-  }
-};
-
-// ─── Calibration routine ─────────────────────────────────────
-void runCalibration() {
-  Serial.println("[CAL] Starting calibration — keep unit still");
-  isCalibrated = false;
-
+// ─── OLED helpers ────────────────────────────────────────────
 #if USE_OLED
-  display.clearDisplay();
-  display.setTextSize(1);
-  display.setTextColor(SSD1306_WHITE);
-  display.setCursor(16, 20);
-  display.println("Calibrating...");
-  display.setCursor(4, 34);
-  display.println("Keep unit still");
-  display.display();
-#endif
 
-  delay(CAL_SETTLE_MS);
-
-  double sumPitch = 0, sumRoll = 0;
-  for (int i = 0; i < CAL_SAMPLES; i++) {
-    sensors_event_t accel, gyro, temp;
-    mpu.getEvent(&accel, &gyro, &temp);
-    sumPitch += atan2(accel.acceleration.y, accel.acceleration.z) * RAD_TO_DEG;
-    sumRoll  += atan2(-accel.acceleration.x, accel.acceleration.z) * RAD_TO_DEG;
-    delay(10);
-  }
-
-  calOffsetPitch = sumPitch / CAL_SAMPLES;
-  calOffsetRoll  = sumRoll  / CAL_SAMPLES;
-  filteredPitch  = 0.0f;
-  filteredRoll   = 0.0f;
-  isCalibrated   = true;
-
-  Serial.printf("[CAL] Done. Offsets: pitch=%.2f roll=%.2f\n",
-                calOffsetPitch, calOffsetRoll);
-
-  // Notify app
-  if (bleConnected) {
-    uint8_t calDone = 0x01;
-    pCharStatus->setValue(&calDone, 1);
-    pCharStatus->notify();
-  }
-}
-
-// ─── Sensor update ───────────────────────────────────────────
-void updateIMU() {
-  sensors_event_t accel, gyro, temp;
-  mpu.getEvent(&accel, &gyro, &temp);
-
-  unsigned long now = millis();
-  float dt = (now - lastSensorTime) / 1000.0f;
-  lastSensorTime = now;
-
-  float accelPitch = atan2(accel.acceleration.y, accel.acceleration.z) * RAD_TO_DEG - calOffsetPitch;
-  float accelRoll  = atan2(-accel.acceleration.x, accel.acceleration.z) * RAD_TO_DEG - calOffsetRoll;
-
-  filteredPitch = COMP_FILTER_ALPHA * (filteredPitch + gyro.gyro.x * dt * RAD_TO_DEG)
-                + (1.0f - COMP_FILTER_ALPHA) * accelPitch;
-  filteredRoll  = COMP_FILTER_ALPHA * (filteredRoll  + gyro.gyro.y * dt * RAD_TO_DEG)
-                + (1.0f - COMP_FILTER_ALPHA) * accelRoll;
-
-  pitch = filteredPitch;
-  roll  = filteredRoll;
-}
-
-// ─── Button handler ──────────────────────────────────────────
-void handleButton() {
-  bool pressed = (digitalRead(CAL_BUTTON_PIN) == LOW);
-
-  if (pressed && !btnWasPressed) {
-    btnPressTime  = millis();
-    btnWasPressed = true;
-  } else if (!pressed && btnWasPressed) {
-    btnWasPressed = false;
-  } else if (pressed && btnWasPressed) {
-    if (millis() - btnPressTime >= CAL_BUTTON_HOLD_MS) {
-      calibratePending = true;
-      btnWasPressed    = false;   // Prevent re-trigger
-      Serial.println("[BTN] Calibration hold detected");
-    }
-  }
-}
-
-// ─── OLED update ─────────────────────────────────────────────
-#if USE_OLED
 void drawAngleBar(int x, int y, int w, float angle, float maxAngle) {
   display.drawRect(x, y, w, 7, SSD1306_WHITE);
   display.drawFastVLine(x + w / 2, y, 7, SSD1306_WHITE);
   int center = x + w / 2;
   int fill   = (int)((angle / maxAngle) * (w / 2));
   fill = constrain(fill, -(w / 2 - 2), (w / 2 - 2));
-  if (fill > 0)      display.fillRect(center, y + 1, fill, 5, SSD1306_WHITE);
+  if (fill > 0)      display.fillRect(center,        y + 1, fill,  5, SSD1306_WHITE);
   else if (fill < 0) display.fillRect(center + fill, y + 1, -fill, 5, SSD1306_WHITE);
 }
 
+// ── Boot screen ──────────────────────────────────────────────
+void showBootScreen(const char* status1 = nullptr, const char* status2 = nullptr) {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+
+  // Logo area — top half
+  display.setTextSize(2);
+  display.setCursor(8, 4);
+  display.print("Inclino");
+  display.setTextSize(1);
+  display.setCursor(92, 10);
+  display.print("CAR");
+
+  // Divider
+  display.drawLine(0, 26, 127, 26, SSD1306_WHITE);
+
+  // Version
+  display.setTextSize(1);
+  display.setCursor(0, 30);
+  display.print("Firmware ");
+  display.print(FW_VERSION);
+
+  // Status lines
+  if (status1) {
+    display.setCursor(0, 44);
+    display.print(status1);
+  }
+  if (status2) {
+    display.setCursor(0, 54);
+    display.print(status2);
+  }
+
+  // Corner dots — decorative
+  display.drawPixel(0,   0,   SSD1306_WHITE);
+  display.drawPixel(127, 0,   SSD1306_WHITE);
+  display.drawPixel(0,   63,  SSD1306_WHITE);
+  display.drawPixel(127, 63,  SSD1306_WHITE);
+
+  display.display();
+}
+
+// ── Error / status screen ────────────────────────────────────
+void showStatusScreen(const char* title, const char* line1,
+                      const char* line2 = nullptr, const char* line3 = nullptr) {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+
+  // Title bar
+  display.fillRect(0, 0, 128, 12, SSD1306_WHITE);
+  display.setTextColor(SSD1306_BLACK);
+  display.setTextSize(1);
+  display.setCursor(2, 2);
+  display.print(title);
+  display.setTextColor(SSD1306_WHITE);
+
+  if (line1) { display.setCursor(0, 16); display.print(line1); }
+  if (line2) { display.setCursor(0, 28); display.print(line2); }
+  if (line3) { display.setCursor(0, 40); display.print(line3); }
+
+  display.display();
+}
+
+// ── Main angle readout ───────────────────────────────────────
 void updateDisplay() {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
@@ -181,10 +145,22 @@ void updateDisplay() {
   display.print("InclinoCar");
   display.drawLine(0, 9, 127, 9, SSD1306_WHITE);
 
+#if USE_IMU
+  if (!imuOk) {
+    display.setCursor(0, 16);
+    display.print("! IMU not found");
+    display.setCursor(0, 28);
+    display.print("Check wiring");
+    display.setCursor(0, 40);
+    display.print("GPIO6=SDA GPIO7=SCL");
+    display.display();
+    return;
+  }
+
   // Pitch
+  char buf[12];
   display.setCursor(0, 13);
   display.print("PITCH");
-  char buf[12];
   snprintf(buf, sizeof(buf), "%+6.1f", pitch);
   display.setCursor(72, 13);
   display.print(buf);
@@ -211,112 +187,227 @@ void updateDisplay() {
     if (!pitchOk) display.print(pitch > 0 ? "Lower front  " : "Raise front  ");
     if (!rollOk)  display.print(roll  > 0 ? "Lower right" : "Lower left");
   }
+#else
+  display.setCursor(0, 20);
+  display.print("IMU disabled");
+  display.setCursor(0, 32);
+  display.print("Build: USE_IMU=1");
+#endif
 
-  // BLE indicator
-  display.setCursor(110, 0);
+  // BLE indicator top-right
+  display.setCursor(108, 0);
   display.print(bleConnected ? "B+" : "B-");
 
   display.display();
 }
+#endif  // USE_OLED
+
+// ─── BLE callbacks ───────────────────────────────────────────
+class ServerCallbacks : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer* pSrv) override {
+    bleConnected = true;
+    Serial.println("[BLE] Client connected");
+  }
+  void onDisconnect(NimBLEServer* pSrv) override {
+    bleConnected = false;
+    Serial.println("[BLE] Client disconnected");
+    NimBLEDevice::startAdvertising();
+  }
+};
+
+class CalibWriteCallback : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* pChar) override {
+    std::string val = pChar->getValue();
+    if (val.length() > 0 && val[0] == 0x01) {
+      calibratePending = true;
+      Serial.println("[BLE] Calibration reset requested via app");
+    }
+  }
+};
+
+// ─── Calibration ─────────────────────────────────────────────
+void runCalibration() {
+#if USE_IMU
+  if (!imuOk) return;
+
+  Serial.println("[CAL] Starting — keep unit still");
+  isCalibrated = false;
+
+#if USE_OLED
+  if (oledOk) showStatusScreen(" Calibrating ", "Keep unit still", "Do not move...");
 #endif
 
-// ─── BLE Setup ───────────────────────────────────────────────
+  delay(CAL_SETTLE_MS);
+
+  double sumPitch = 0, sumRoll = 0;
+  for (int i = 0; i < CAL_SAMPLES; i++) {
+    sensors_event_t accel, gyro, temp;
+    mpu.getEvent(&accel, &gyro, &temp);
+    sumPitch += atan2(accel.acceleration.y, accel.acceleration.z) * RAD_TO_DEG;
+    sumRoll  += atan2(-accel.acceleration.x, accel.acceleration.z) * RAD_TO_DEG;
+    delay(10);
+  }
+  calOffsetPitch = sumPitch / CAL_SAMPLES;
+  calOffsetRoll  = sumRoll  / CAL_SAMPLES;
+  filteredPitch  = 0.0f;
+  filteredRoll   = 0.0f;
+  isCalibrated   = true;
+
+  Serial.printf("[CAL] Done. Offsets: pitch=%.2f roll=%.2f\n", calOffsetPitch, calOffsetRoll);
+
+  if (bleConnected) {
+    uint8_t done = 0x01;
+    pCharStatus->setValue(&done, 1);
+    pCharStatus->notify();
+  }
+#endif
+}
+
+// ─── IMU update ──────────────────────────────────────────────
+void updateIMU() {
+#if USE_IMU
+  if (!imuOk) return;
+  sensors_event_t accel, gyro, temp;
+  mpu.getEvent(&accel, &gyro, &temp);
+  unsigned long now = millis();
+  float dt = (now - lastSensorTime) / 1000.0f;
+  lastSensorTime = now;
+  float accelPitch = atan2(accel.acceleration.y,  accel.acceleration.z) * RAD_TO_DEG - calOffsetPitch;
+  float accelRoll  = atan2(-accel.acceleration.x, accel.acceleration.z) * RAD_TO_DEG - calOffsetRoll;
+  filteredPitch = COMP_FILTER_ALPHA * (filteredPitch + gyro.gyro.x * dt * RAD_TO_DEG)
+                + (1.0f - COMP_FILTER_ALPHA) * accelPitch;
+  filteredRoll  = COMP_FILTER_ALPHA * (filteredRoll  + gyro.gyro.y * dt * RAD_TO_DEG)
+                + (1.0f - COMP_FILTER_ALPHA) * accelRoll;
+  pitch = filteredPitch;
+  roll  = filteredRoll;
+#endif
+}
+
+// ─── Button ──────────────────────────────────────────────────
+void handleButton() {
+  bool pressed = (digitalRead(CAL_BUTTON_PIN) == LOW);
+  if (pressed && !btnWasPressed) {
+    btnPressTime  = millis();
+    btnWasPressed = true;
+  } else if (!pressed && btnWasPressed) {
+    btnWasPressed = false;
+  } else if (pressed && btnWasPressed) {
+    if (millis() - btnPressTime >= CAL_BUTTON_HOLD_MS) {
+      calibratePending = true;
+      btnWasPressed    = false;
+      Serial.println("[BTN] Calibration hold detected");
+    }
+  }
+}
+
+// ─── BLE setup ───────────────────────────────────────────────
 void setupBLE() {
   NimBLEDevice::init(BLE_DEVICE_NAME);
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
+  NimBLEService* pSvc = pServer->createService(BLE_SERVICE_UUID);
 
-  NimBLEService* pService = pServer->createService(BLE_SERVICE_UUID);
-
-  pCharPitch = pService->createCharacteristic(
-    BLE_CHAR_PITCH_UUID,
-    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-  );
-  pCharRoll = pService->createCharacteristic(
-    BLE_CHAR_ROLL_UUID,
-    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-  );
-  pCharCalib = pService->createCharacteristic(
-    BLE_CHAR_CALIBRATE_UUID,
-    NIMBLE_PROPERTY::WRITE
-  );
+  pCharPitch = pSvc->createCharacteristic(BLE_CHAR_PITCH_UUID,
+                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  pCharRoll  = pSvc->createCharacteristic(BLE_CHAR_ROLL_UUID,
+                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  pCharCalib = pSvc->createCharacteristic(BLE_CHAR_CALIBRATE_UUID,
+                  NIMBLE_PROPERTY::WRITE);
   pCharCalib->setCallbacks(new CalibWriteCallback());
+  pCharStatus = pSvc->createCharacteristic(BLE_CHAR_STATUS_UUID,
+                  NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
 
-  pCharStatus = pService->createCharacteristic(
-    BLE_CHAR_STATUS_UUID,
-    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY
-  );
-
-  pService->start();
+  pSvc->start();
   NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
   pAdv->addServiceUUID(BLE_SERVICE_UUID);
   pAdv->setScanResponse(true);
   NimBLEDevice::startAdvertising();
-  Serial.println("[BLE] Advertising as InclinoCar");
+  Serial.println("[BLE] Advertising as " BLE_DEVICE_NAME);
 }
 
 // ─── Setup ───────────────────────────────────────────────────
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== InclinoCar Core Unit v0.1.0 ===");
+  Serial.println("\n=== InclinoCar Core Unit " FW_VERSION " ===");
 
-  // Calibration button
   pinMode(CAL_BUTTON_PIN, INPUT_PULLUP);
 
-  Wire.begin(I2C_SDA, I2C_SCL);
-
-  // MPU-6050
-  if (!mpu.begin(MPU_I2C_ADDR)) {
-    Serial.println("[ERROR] MPU-6050 not found! Check wiring.");
-    while (1) delay(100);
-  }
-  mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
-  mpu.setGyroRange(MPU6050_RANGE_250_DEG);
-  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-  Serial.println("[OK] MPU-6050 initialized");
-
+  // ── Init OLED bus (GPIO3=SDA, GPIO4=SCL) ──
 #if USE_OLED
+  WireOLED.begin(OLED_I2C_SDA, OLED_I2C_SCL);
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
-    Serial.println("[WARN] SSD1306 not found");
+    Serial.println("[WARN] SSD1306 not found (GPIO3/4) — display disabled");
+    oledOk = false;
   } else {
-    display.clearDisplay();
-    display.setTextSize(1);
-    display.setTextColor(SSD1306_WHITE);
-    display.setCursor(20, 20);
-    display.println("InclinoCar v0.1");
-    display.setCursor(28, 32);
-    display.println("Core Unit");
-    display.display();
-    Serial.println("[OK] OLED initialized");
-    delay(1200);
+    oledOk = true;
+    Serial.println("[OK] OLED on GPIO3(SDA)/GPIO4(SCL)");
+    // Boot screen — show immediately, status will be filled in below
+    showBootScreen("Initialising...");
   }
 #endif
 
+  // ── Init IMU bus (GPIO6=SDA, GPIO7=SCL) ──
+#if USE_IMU
+  WireIMU.begin(IMU_I2C_SDA, IMU_I2C_SCL);
+  if (!mpu.begin(MPU_I2C_ADDR, &WireIMU)) {
+    Serial.println("[WARN] MPU-6050 not found (GPIO6/7)");
+    imuOk = false;
+#if USE_OLED
+    if (oledOk) showBootScreen("OLED OK", "! IMU not found");
+#endif
+  } else {
+    mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
+    mpu.setGyroRange(MPU6050_RANGE_250_DEG);
+    mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+    imuOk = true;
+    Serial.println("[OK] MPU-6050 on GPIO6(SDA)/GPIO7(SCL)");
+#if USE_OLED
+    if (oledOk) showBootScreen("OLED OK", "IMU OK");
+#endif
+  }
+#else
+  // IMU disabled in build flags
+#if USE_OLED
+  if (oledOk) showBootScreen("OLED OK", "IMU: disabled");
+#endif
+#endif
+
+  // ── ESP-NOW ──
 #if USE_ESPNOW
   WiFi.mode(WIFI_STA);
   Serial.print("[INFO] Core MAC: ");
   Serial.println(WiFi.macAddress());
-
   if (esp_now_init() != ESP_OK) {
-    Serial.println("[ERROR] ESP-NOW init failed");
+    Serial.println("[WARN] ESP-NOW init failed");
   } else {
-    // Register broadcast peer
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, broadcastAddr, 6);
     peer.channel = 0;
     peer.encrypt = false;
     esp_now_add_peer(&peer);
-    Serial.println("[OK] ESP-NOW broadcast initialized");
+    Serial.println("[OK] ESP-NOW broadcast ready");
   }
 #endif
 
   setupBLE();
-
   lastSensorTime = millis();
 
-  // Initial calibration on boot
-  runCalibration();
+  // Hold boot screen for BOOT_SCREEN_MS, then calibrate
+  unsigned long bootStart = millis();
+
+#if USE_IMU
+  if (imuOk) {
+    // Wait remaining boot screen time then calibrate
+    long remaining = BOOT_SCREEN_MS - (long)(millis() - bootStart);
+    if (remaining > 0) delay(remaining);
+    runCalibration();
+  } else {
+    delay(BOOT_SCREEN_MS);
+  }
+#else
+  delay(BOOT_SCREEN_MS);
+#endif
 
   Serial.println("[OK] Setup complete");
 }
@@ -334,10 +425,10 @@ void loop() {
   if (now - lastUpdate >= UPDATE_INTERVAL_MS) {
     lastUpdate = now;
 
-    if (isCalibrated) {
+#if USE_IMU
+    if (imuOk && isCalibrated) {
       updateIMU();
 
-      // BLE notify
       if (bleConnected) {
         pCharPitch->setValue(pitch);
         pCharPitch->notify();
@@ -346,16 +437,16 @@ void loop() {
       }
 
 #if USE_ESPNOW
-      // Broadcast to satellite display
       CoreData data = { pitch, roll, isCalibrated };
       esp_now_send(broadcastAddr, (uint8_t*)&data, sizeof(data));
 #endif
 
       Serial.printf("[IMU] Pitch: %+6.2f  Roll: %+6.2f\n", pitch, roll);
     }
+#endif
 
 #if USE_OLED
-    updateDisplay();
+    if (oledOk) updateDisplay();
 #endif
   }
 }

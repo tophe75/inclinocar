@@ -31,37 +31,41 @@ No IMU on the Satellite — it only receives data from the Core and displays it.
 ## Wiring
 
 ### Core Unit
+
+The OLED and MPU-6050 use **separate I2C buses** — isolated so a sensor issue cannot affect the display.
+
 ```
-MPU-6050 (GY-521)          ESP32-C3
-─────────────────          ─────────
+SSD1306 OLED (I2C Bus 0)   ESP32-C3
+────────────────────────   ─────────
+GND              →         GND      ← direct-solder friendly:
+VCC              →         3.3V         pin order on module matches
+SCL              →         GPIO4        ESP32-C3 pin row
+SDA              →         GPIO3
+
+MPU-6050 GY-521 (I2C Bus 1)  ESP32-C3
+────────────────────────────  ─────────
 VCC              →         3.3V
 GND              →         GND
 SDA              →         GPIO6
 SCL              →         GPIO7
 AD0              →         GND     (I2C address: 0x68)
 
-SSD1306 OLED               ESP32-C3
-─────────────────          ─────────
-VCC              →         3.3V
-GND              →         GND
-SDA              →         GPIO6   (shared I2C bus)
-SCL              →         GPIO7   (shared I2C bus)
-
 Calibration Button         ESP32-C3
 ──────────────────         ─────────
-Terminal 1       →         GPIO3
+Terminal 1       →         GPIO5
 Terminal 2       →         GND
 (internal pull-up enabled — no resistor needed)
 ```
 
 ### Satellite Display Unit
+
 ```
 SSD1306 OLED               ESP32-C3
-─────────────────          ─────────
-VCC              →         3.3V
+────────────────────────   ─────────
 GND              →         GND
-SDA              →         GPIO6
-SCL              →         GPIO7
+VCC              →         3.3V
+SCL              →         GPIO4
+SDA              →         GPIO3
 ```
 
 ---

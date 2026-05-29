@@ -338,6 +338,69 @@
     }
     footer a { color: var(--text-dim); }
 
+
+    /* ── Serial Terminal ── */
+    .terminal-wrap { margin-top: 16px; display: none; }
+    .terminal-wrap.visible { display: block; }
+    .terminal-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 6px;
+    }
+    .terminal-title {
+      font-family: var(--mono);
+      font-size: 0.75rem;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+    }
+    .terminal-controls { display: flex; gap: 8px; }
+    .terminal-btn {
+      font-family: var(--mono);
+      font-size: 0.7rem;
+      color: var(--text-dim);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 2px 8px;
+      cursor: pointer;
+    }
+    .terminal-btn:hover { border-color: var(--green-dim); color: var(--text); }
+    .terminal-screen {
+      background: #000;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 12px 14px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      line-height: 1.6;
+      height: 220px;
+      overflow-y: auto;
+      color: #33ff33;
+    }
+    .terminal-screen .t-line { display: block; }
+    .terminal-screen .t-warn  { color: var(--amber); }
+    .terminal-screen .t-error { color: var(--red); }
+    .terminal-screen .t-dim   { color: #1a8a1a; }
+    .terminal-input-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 6px;
+    }
+    .terminal-input {
+      flex: 1;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 6px 10px;
+      font-family: var(--mono);
+      font-size: 0.78rem;
+      color: #33ff33;
+      outline: none;
+    }
+    .terminal-input:focus { border-color: var(--green-dim); }
+    .terminal-input::placeholder { color: #1a5a1a; }
+
     @keyframes spin { to { transform: rotate(360deg); } }
     .spinner {
       display: inline-block;
@@ -480,6 +543,33 @@
     <div class="btn-row">
       <button class="btn btn-primary" onclick="flashAnother()">Flash Another Unit</button>
       <a class="btn btn-secondary" href="https://github.com/tophe75/inclinocar" target="_blank">View on GitHub ↗</a>
+    </div>
+  </div>
+
+
+  <!-- Serial Terminal -->
+  <div class="card" id="card-terminal" style="display:none">
+    <div class="card-header">
+      <span class="step-num">⌨</span>
+      <h2>Serial Terminal</h2>
+      <span class="status-icon" id="terminal-icon">○</span>
+    </div>
+    <p>Monitor serial output from the ESP32 while connected. Useful for debugging after flashing.</p>
+    <div class="terminal-wrap visible">
+      <div class="terminal-header">
+        <span class="terminal-title">SERIAL OUTPUT — 115200 BAUD</span>
+        <div class="terminal-controls">
+          <button class="terminal-btn" onclick="clearTerminal()">Clear</button>
+          <button class="terminal-btn" id="btn-term-toggle" onclick="toggleTerminal()">Stop</button>
+        </div>
+      </div>
+      <div class="terminal-screen" id="terminal-screen"></div>
+      <div class="terminal-input-row">
+        <input class="terminal-input" id="terminal-input"
+               placeholder="Type command and press Enter…"
+               onkeydown="if(event.key==='Enter') sendTerminalLine()">
+        <button class="terminal-btn" onclick="sendTerminalLine()">Send</button>
+      </div>
     </div>
   </div>
 
@@ -635,7 +725,6 @@ async function startFlash() {
     // Self-hosted ES module — dynamic import avoids CDN corruption
     const esptool = await import('./libs/esptool-bundle.js');
     // Log all keys to diagnose what the bundle actually exports
-    log('Bundle keys: ' + Object.keys(esptool).join(', '), 'ok');
     const ESPLoader = esptool.ESPLoader;
     const Transport = esptool.Transport;
     if (!ESPLoader || !Transport) throw new Error('Bundle loaded but ESPLoader/Transport missing. Keys: ' + Object.keys(esptool).join(', '));
@@ -692,6 +781,10 @@ async function startFlash() {
     document.getElementById('card-done').style.display = 'block';
     document.getElementById('done-msg').textContent = FW_INFO[selectedFw].done;
     document.getElementById('btn-reset').style.display = 'inline-flex';
+    // Show terminal and auto-connect
+    document.getElementById('card-terminal').style.display = 'block';
+    document.getElementById('card-terminal').classList.add('active');
+    await openTerminal();
 
   } catch (e) {
     log('Flash failed: ' + e.message, 'error');
@@ -738,6 +831,9 @@ function flashAnother() {
   document.getElementById('btn-connect').disabled     = false;
   document.getElementById('btn-flash').disabled       = true;
   document.getElementById('card-done').style.display  = 'none';
+  document.getElementById('card-terminal').style.display = 'none';
+  termRunning = false;
+  try { await termReader?.cancel(); } catch {}
   document.getElementById('card-flash').classList.remove('success', 'error');
   document.getElementById('flash-icon').textContent   = '○';
   document.getElementById('progress-wrap').classList.remove('visible');
@@ -746,6 +842,92 @@ function flashAnother() {
   document.getElementById('btn-reset').style.display  = 'none';
   setProgress('Initializing…', 0);
 }
+// ─────────────────────────────────────────────────────────────
+//  Serial Terminal
+// ─────────────────────────────────────────────────────────────
+let termReader    = null;
+let termRunning   = false;
+let termPort      = null;   // separate port reference for terminal
+
+async function openTerminal() {
+  if (!serialPort) { termLog('No port selected — flash first', 'error'); return; }
+  termPort = serialPort;
+  try {
+    // Port may already be closed after flashing — open it
+    if (!termPort.readable) {
+      await termPort.open({ baudRate: 115200 });
+    }
+    termRunning = true;
+    document.getElementById('terminal-icon').textContent = '●';
+    document.getElementById('btn-term-toggle').textContent = 'Stop';
+    termLog('Terminal connected at 115200 baud', 'dim');
+    readTerminalLoop();
+  } catch (e) {
+    termLog('Could not open terminal: ' + e.message, 'error');
+  }
+}
+
+async function readTerminalLoop() {
+  const decoder = new TextDecoderStream();
+  const pipeTo  = termPort.readable.pipeTo(decoder.writable);
+  termReader    = decoder.readable.getReader();
+  let lineBuffer = '';
+  try {
+    while (termRunning) {
+      const { value, done } = await termReader.read();
+      if (done) break;
+      lineBuffer += value;
+      const parts = lineBuffer.split(/\r?\n/);
+      for (let i = 0; i < parts.length - 1; i++) {
+        termLog(parts[i]);
+      }
+      lineBuffer = parts[parts.length - 1];
+    }
+  } catch (e) {
+    if (termRunning) termLog('Read error: ' + e.message, 'error');
+  } finally {
+    termReader.releaseLock();
+  }
+}
+
+async function toggleTerminal() {
+  if (termRunning) {
+    termRunning = false;
+    try { await termReader?.cancel(); } catch {}
+    document.getElementById('terminal-icon').textContent = '○';
+    document.getElementById('btn-term-toggle').textContent = 'Start';
+    termLog('Terminal stopped', 'dim');
+  } else {
+    await openTerminal();
+  }
+}
+
+async function sendTerminalLine() {
+  const input = document.getElementById('terminal-input');
+  const text  = input.value.trim();
+  if (!text || !termPort?.writable) return;
+  const encoder = new TextEncoder();
+  const writer  = termPort.writable.getWriter();
+  await writer.write(encoder.encode(text + '\r\n'));
+  writer.releaseLock();
+  termLog('> ' + text, 'dim');
+  input.value = '';
+}
+
+function termLog(msg, cls = '') {
+  const screen = document.getElementById('terminal-screen');
+  const line   = document.createElement('span');
+  line.className = 't-line' + (cls ? ' t-' + cls : '');
+  line.textContent = msg;
+  screen.appendChild(line);
+  screen.appendChild(document.createElement('br'));
+  screen.scrollTop = screen.scrollHeight;
+}
+
+function clearTerminal() {
+  document.getElementById('terminal-screen').innerHTML = '';
+}
+
 </script>
 </body>
 </html>
