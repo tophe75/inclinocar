@@ -45,24 +45,8 @@ jobs:
 
       - name: Inject version into platformio.ini
         run: |
-          TAG="${{ steps.ver.outputs.tag }}"
-          INI="${{ matrix.project }}/platformio.ini"
-          cat > /tmp/setver.py << 'EOF'
-import sys, re
-tag, path = sys.argv[1], sys.argv[2]
-txt = open(path).read()
-txt = re.sub(r'[ 	]*-DFW_VERSION=[^
-]*
-', '', txt)
-txt = txt.rstrip() + '
-    -DFW_VERSION=\\"' + tag + '\\"
-'
-open(path, 'w').write(txt)
-print('FW_VERSION set to', tag)
-EOF
-          python3 /tmp/setver.py "$TAG" "$INI"
-          grep FW_VERSION "$INI"
-
+          python3 scripts/set_version.py "${{ steps.ver.outputs.tag }}" "${{ matrix.project }}/platformio.ini"
+          grep FW_VERSION "${{ matrix.project }}/platformio.ini"
       - name: Build ${{ matrix.unit }} firmware
         working-directory: ${{ matrix.project }}
         run: pio run -v
