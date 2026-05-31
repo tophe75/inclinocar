@@ -398,23 +398,30 @@ void setup() {
   setupBLE();
   lastSensorTime = millis();
 
-  // Hold boot screen for BOOT_SCREEN_MS, then calibrate
-  unsigned long bootStart = millis();
+  // Show final boot screen status and hold for BOOT_SCREEN_MS
+#if USE_OLED
+  if (oledOk) {
+  #if USE_IMU
+    if (imuOk)
+      showBootScreen("OLED OK  IMU OK", "Calibrating...");
+    else
+      showBootScreen("OLED OK", "! IMU not found");
+  #else
+    showBootScreen("OLED OK", "IMU: disabled");
+  #endif
+  }
+#endif
+
+  Serial.println("[BOOT] Showing boot screen...");
+  delay(BOOT_SCREEN_MS);
 
 #if USE_IMU
   if (imuOk) {
-    // Wait remaining boot screen time then calibrate
-    long remaining = BOOT_SCREEN_MS - (long)(millis() - bootStart);
-    if (remaining > 0) delay(remaining);
     runCalibration();
-  } else {
-    delay(BOOT_SCREEN_MS);
   }
-#else
-  delay(BOOT_SCREEN_MS);
 #endif
 
-  Serial.println("[OK] Setup complete");
+  Serial.println("[OK] Setup complete — entering main loop");
 }
 
 // ─── Loop ────────────────────────────────────────────────────
