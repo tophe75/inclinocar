@@ -1,0 +1,15 @@
+{
+  "name": "InclinoCar",
+  "version": "0.1.0",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-C3",
+      "parts": [
+        { "path": "bins/bootloader.bin",  "offset": 0 },
+        { "path": "bins/partitions.bin",  "offset": 32768 },
+        { "path": "bins/firmware.bin",    "offset": 65536 }
+      ]
+    }
+  ]
+}
