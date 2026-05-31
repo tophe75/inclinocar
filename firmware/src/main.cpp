@@ -33,14 +33,15 @@ void setup() {
     display.display();
   }
 
-  // Init IMU bus then sensor
+  Serial.println("Initialising IMU bus...");
   i2c1.begin(6, 7, 400000);
+  Serial.println("IMU bus started, scanning 0x68...");
   if (!mpu.begin(0x68, &i2c1)) {
-    Serial.println("MPU-6050 not found - check GPIO6/7");
+    Serial.println("MPU-6050 not found - check GPIO6/7 and AD0=GND");
     display.println("IMU not found!");
-    display.println("Check GPIO6/7");
+    display.println("GPIO6=SDA GPIO7=SCL");
+    display.println("AD0 must be GND");
     display.display();
-    while (1) delay(1000);
   }
   Serial.println("MPU-6050 OK");
   display.println("IMU OK");
