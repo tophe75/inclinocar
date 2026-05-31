@@ -20,8 +20,8 @@ void setup() {
   Serial.begin(115200);
   Serial.println("InclinoCar " FW_VERSION " starting...");
 
-  // Init OLED bus then display
-  Wire.begin(OLED_SDA, OLED_SCL);
+  // Set OLED pins — let display.begin() init the bus itself
+  Wire.setPins(OLED_SDA, OLED_SCL);
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println("OLED not found");
   } else {
