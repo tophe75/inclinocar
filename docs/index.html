@@ -12,10 +12,9 @@
       --card:  #111e11;
       --text:  #c8e6c8;
       --dim:   #5a8a5a;
+      --border:#1e3a1e;
     }
-
     * { box-sizing: border-box; margin: 0; padding: 0; }
-
     body {
       background: var(--bg);
       color: var(--text);
@@ -26,17 +25,15 @@
       justify-content: center;
       padding: 24px;
     }
-
     .card {
       background: var(--card);
-      border: 1px solid #1e3a1e;
+      border: 1px solid var(--border);
       border-radius: 12px;
       padding: 40px;
-      max-width: 480px;
+      max-width: 500px;
       width: 100%;
       text-align: center;
     }
-
     .logo {
       font-size: 2.2rem;
       font-weight: 200;
@@ -44,35 +41,55 @@
       color: var(--green);
       margin-bottom: 8px;
     }
-
     .tagline {
       color: var(--dim);
       font-size: 0.85rem;
       letter-spacing: 2px;
       text-transform: uppercase;
-      margin-bottom: 32px;
+      margin-bottom: 28px;
     }
-
+    .selectors {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    .selector-group { text-align: left; }
+    .selector-group label {
+      display: block;
+      font-size: 0.75rem;
+      color: var(--dim);
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    select {
+      width: 100%;
+      background: #0a120a;
+      color: var(--text);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 0.9rem;
+      font-family: inherit;
+      appearance: none;
+      cursor: pointer;
+    }
+    select:focus { outline: none; border-color: var(--green); }
     .info {
       background: #0a120a;
-      border: 1px solid #1e3a1e;
+      border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 28px;
-      font-size: 0.85rem;
+      padding: 14px;
+      margin-bottom: 20px;
+      font-size: 0.82rem;
       color: var(--dim);
       line-height: 1.7;
       text-align: left;
+      min-height: 60px;
     }
-
     .info strong { color: var(--text); }
-
-    esp-web-install-button {
-      display: block;
-      margin-bottom: 20px;
-    }
-
-    /* Style the install button */
+    esp-web-install-button { display: block; margin-bottom: 16px; }
     esp-web-install-button::part(button) {
       background: #1a4a1a;
       color: var(--green);
@@ -86,71 +103,91 @@
       width: 100%;
       transition: background 0.2s;
     }
-
-    esp-web-install-button::part(button):hover {
-      background: #254a25;
-    }
-
+    esp-web-install-button::part(button):hover { background: #254a25; }
     .footer {
-      margin-top: 24px;
       font-size: 0.75rem;
       color: var(--dim);
     }
-
     .footer a { color: var(--dim); }
-
-    .browser-warning {
-      display: none;
-      background: #2a1a1a;
-      border: 1px solid #5a2a2a;
-      border-radius: 8px;
-      padding: 14px;
-      margin-bottom: 20px;
-      font-size: 0.85rem;
-      color: #ef9a9a;
-    }
   </style>
 </head>
 <body>
-  <div class="card">
+<div class="card">
+  <div class="logo">INCLINOCAR</div>
+  <div class="tagline">Rooftop Tent Leveling System</div>
 
-    <div class="logo">INCLINOCAR</div>
-    <div class="tagline">Rooftop Tent Leveling System</div>
-
-    <div class="info">
-      <strong>What this installs:</strong> Firmware for the ESP32-C3 Core Unit.
-      Reads pitch &amp; roll from the MPU-6050 and displays it on the OLED screen.<br><br>
-      <strong>Requirements:</strong> Chrome or Edge browser on desktop.
-      Hold the <strong>BOOT</strong> button on the ESP32-C3, plug in USB, then release.
+  <div class="selectors">
+    <div class="selector-group">
+      <label>Version</label>
+      <select id="version-select" onchange="updateManifest()">
+        <option value="">Loading...</option>
+      </select>
     </div>
-
-    <div class="browser-warning" id="browser-warning">
-      Web Serial is not supported in this browser.<br>
-      Please use <strong>Chrome</strong> or <strong>Edge</strong> on desktop.
+    <div class="selector-group">
+      <label>Firmware</label>
+      <select id="firmware-select" onchange="updateManifest()">
+        <option value="core">Core Unit</option>
+        <option value="satellite">Satellite Display</option>
+      </select>
     </div>
-
-    <esp-web-install-button manifest="manifest.json">
-      <span slot="unsupported">
-        <div class="browser-warning" style="display:block">
-          Web Serial is not supported in this browser.<br>
-          Please use <strong>Chrome</strong> or <strong>Edge</strong> on desktop.
-        </div>
-      </span>
-    </esp-web-install-button>
-
-    <div class="footer">
-      <a href="https://github.com/tophe75/inclinocar" target="_blank">
-        github.com/tophe75/inclinocar
-      </a>
-      &nbsp;·&nbsp; Requires Chrome / Edge
-    </div>
-
   </div>
 
-  <script>
-    if (!('serial' in navigator)) {
-      document.getElementById('browser-warning').style.display = 'block';
-    }
-  </script>
+  <div class="info" id="fw-info">
+    <strong>Core Unit</strong> — reads MPU-6050 pitch &amp; roll, shows on OLED display.
+  </div>
+
+  <esp-web-install-button id="install-btn" manifest="manifest.json">
+    <span slot="unsupported">
+      Web Serial not supported. Please use <strong>Chrome</strong> or <strong>Edge</strong>.
+    </span>
+  </esp-web-install-button>
+
+  <div class="footer">
+    <a href="https://github.com/tophe75/inclinocar" target="_blank">github.com/tophe75/inclinocar</a>
+    &nbsp;·&nbsp; Requires Chrome / Edge · Hold BOOT, plug USB, release BOOT
+  </div>
+</div>
+
+<script>
+const REPO = 'tophe75/inclinocar';
+
+const FW_INFO = {
+  core:      '<strong>Core Unit</strong> — reads MPU-6050 pitch &amp; roll, displays on OLED. SDA=GPIO3/SCL=GPIO4 (OLED), SDA=GPIO6/SCL=GPIO7 (IMU).',
+  satellite: '<strong>Satellite Display</strong> — receives data from Core Unit via ESP-NOW and shows on OLED. SDA=GPIO3/SCL=GPIO4.'
+};
+
+async function loadVersions() {
+  try {
+    const res  = await fetch(`https://api.github.com/repos/${REPO}/releases`);
+    const data = await res.json();
+    const sel  = document.getElementById('version-select');
+    sel.innerHTML = '';
+    data.forEach((r, i) => {
+      const opt = document.createElement('option');
+      opt.value = r.tag_name;
+      opt.text  = r.tag_name + (i === 0 ? ' (latest)' : '');
+      sel.appendChild(opt);
+    });
+    updateManifest();
+  } catch (e) {
+    document.getElementById('version-select').innerHTML = '<option>Could not load</option>';
+  }
+}
+
+function updateManifest() {
+  const version  = document.getElementById('version-select').value;
+  const firmware = document.getElementById('firmware-select').value;
+  if (!version) return;
+
+  // Point to the manifest for this version/firmware combo
+  // Bins are in docs/bins/ committed by CI — manifest is always current
+  // For version-specific installs we use the GitHub raw URL
+  const base = `https://raw.githubusercontent.com/${REPO}/${version}/docs`;
+  document.getElementById('install-btn').setAttribute('manifest', `${base}/manifest.json`);
+  document.getElementById('fw-info').innerHTML = FW_INFO[firmware] || '';
+}
+
+loadVersions();
+</script>
 </body>
 </html>
