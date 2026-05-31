@@ -145,7 +145,7 @@ void setup() {
   delay(500);
   Serial.println("\n=== InclinoCar Satellite Display " FW_VERSION " ===");
 
-  Wire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
+  Wire.setPins(OLED_I2C_SDA, OLED_I2C_SCL);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
     Serial.println("[ERROR] SSD1306 not found! Check GPIO3(SDA)/GPIO4(SCL)");

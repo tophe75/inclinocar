@@ -282,7 +282,8 @@ void setup() {
   pinMode(CAL_BUTTON_PIN, INPUT_PULLUP);
 
   // OLED on Bus 0 (GPIO3=SDA, GPIO4=SCL)
-  Wire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
+  // Set pins first, then let display.begin() initialise the bus
+  Wire.setPins(OLED_I2C_SDA, OLED_I2C_SCL);
   if (display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
     oledOk = true;
     Serial.println("[OK] OLED GPIO3/4");
