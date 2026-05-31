@@ -52,7 +52,7 @@
 #define WARNING_THRESHOLD_DEG   2.0f
 
 // ─── Firmware version ────────────────────────────────────────
-// Set via platformio.ini build_flag, falls back if not defined
+// Overridden at build time via platformio.ini -DFW_VERSION="vX.X.X"
 #ifndef FW_VERSION
-  #define FW_VERSION "v?.?.?"
+  #define FW_VERSION "v0.1.14"
 #endif
