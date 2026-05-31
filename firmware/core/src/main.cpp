@@ -10,13 +10,12 @@
 #include "config.h"
 
 // ─── I2C buses ───────────────────────────────────────────────
-// Bus 0: OLED  — SDA=GPIO3, SCL=GPIO4 (direct-solder friendly)
-// Bus 1: IMU   — SDA=GPIO6, SCL=GPIO7
-TwoWire WireOLED = TwoWire(0);
-TwoWire WireIMU  = TwoWire(1);
+// Wire  (Bus 0): OLED — SDA=GPIO3, SCL=GPIO4 (direct-solder friendly)
+// Wire1 (Bus 1): IMU  — SDA=GPIO6, SCL=GPIO7
+// Using Arduino's built-in Wire/Wire1 avoids double-init issues
 
 // ─── Peripherals ─────────────────────────────────────────────
-Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &WireOLED, OLED_RESET);
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
 Adafruit_MPU6050 mpu;
 
 bool oledOk = false;
@@ -283,7 +282,7 @@ void setup() {
   pinMode(CAL_BUTTON_PIN, INPUT_PULLUP);
 
   // OLED on Bus 0 (GPIO3=SDA, GPIO4=SCL)
-  WireOLED.begin(OLED_I2C_SDA, OLED_I2C_SCL);
+  Wire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
   if (display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
     oledOk = true;
     Serial.println("[OK] OLED GPIO3/4");
@@ -293,8 +292,8 @@ void setup() {
   }
 
   // IMU on Bus 1 (GPIO6=SDA, GPIO7=SCL)
-  WireIMU.begin(IMU_I2C_SDA, IMU_I2C_SCL);
-  if (mpu.begin(MPU_I2C_ADDR, &WireIMU)) {
+  Wire1.begin(IMU_I2C_SDA, IMU_I2C_SCL);
+  if (mpu.begin(MPU_I2C_ADDR, &Wire1)) {
     mpu.setAccelerometerRange(MPU6050_RANGE_2_G);
     mpu.setGyroRange(MPU6050_RANGE_250_DEG);
     mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);

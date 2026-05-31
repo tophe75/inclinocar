@@ -7,10 +7,10 @@
 #include "config.h"
 
 // ─── I2C Bus ─────────────────────────────────────────────────
-TwoWire WireOLED = TwoWire(0);
+
 
 // ─── Display ─────────────────────────────────────────────────
-Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &WireOLED, OLED_RESET);
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
 bool oledOk = false;
 
 // ─── Received data ────────────────────────────────────────────
@@ -145,7 +145,7 @@ void setup() {
   delay(500);
   Serial.println("\n=== InclinoCar Satellite Display " FW_VERSION " ===");
 
-  WireOLED.begin(OLED_I2C_SDA, OLED_I2C_SCL);
+  Wire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
 
   if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
     Serial.println("[ERROR] SSD1306 not found! Check GPIO3(SDA)/GPIO4(SCL)");
