@@ -10,12 +10,15 @@
 #include "config.h"
 
 // ─── I2C buses ───────────────────────────────────────────────
-// Wire  (Bus 0): OLED — SDA=GPIO3, SCL=GPIO4 (direct-solder friendly)
-// Wire1 (Bus 1): IMU  — SDA=GPIO6, SCL=GPIO7
-// Using Arduino's built-in Wire/Wire1 avoids double-init issues
+// Bus 0: OLED — SDA=GPIO3, SCL=GPIO4 (direct-solder friendly)
+// Bus 1: IMU  — SDA=GPIO6, SCL=GPIO7
+// We manage both buses manually to control pin assignment
 
 // ─── Peripherals ─────────────────────────────────────────────
-Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
+// OLED uses a dedicated TwoWire instance on bus 0
+// We call begin() ourselves before display.begin() so pins are set correctly
+TwoWire oledWire(0);
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &oledWire, OLED_RESET);
 Adafruit_MPU6050 mpu;
 
 bool oledOk = false;
@@ -282,9 +285,8 @@ void setup() {
   pinMode(CAL_BUTTON_PIN, INPUT_PULLUP);
 
   // OLED on Bus 0 (GPIO3=SDA, GPIO4=SCL)
-  // Set pins first, then let display.begin() initialise the bus
-  Wire.setPins(OLED_I2C_SDA, OLED_I2C_SCL);
-  if (display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
+  oledWire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
+  if (display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR, false)) {
     oledOk = true;
     Serial.println("[OK] OLED GPIO3/4");
     showBootScreen("Initialising...");

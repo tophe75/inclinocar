@@ -10,7 +10,8 @@
 
 
 // ─── Display ─────────────────────────────────────────────────
-Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &Wire, OLED_RESET);
+TwoWire oledWire(0);
+Adafruit_SSD1306 display(OLED_WIDTH, OLED_HEIGHT, &oledWire, OLED_RESET);
 bool oledOk = false;
 
 // ─── Received data ────────────────────────────────────────────
@@ -145,9 +146,9 @@ void setup() {
   delay(500);
   Serial.println("\n=== InclinoCar Satellite Display " FW_VERSION " ===");
 
-  Wire.setPins(OLED_I2C_SDA, OLED_I2C_SCL);
+  oledWire.begin(OLED_I2C_SDA, OLED_I2C_SCL);
 
-  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR)) {
+  if (!display.begin(SSD1306_SWITCHCAPVCC, OLED_I2C_ADDR, false)) {
     Serial.println("[ERROR] SSD1306 not found! Check GPIO3(SDA)/GPIO4(SCL)");
     oledOk = false;
     // Carry on — Serial is still useful
