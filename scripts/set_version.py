@@ -14,8 +14,9 @@ txt = open(path).read()
 # Remove any existing FW_VERSION line
 txt = re.sub(r'[ \t]*-DFW_VERSION=[^\n]*\n', '', txt)
 
-# Append fresh FW_VERSION at the end of build_flags
-txt = txt.rstrip() + '\n    -DFW_VERSION=\\"' + tag + '\\"\n'
+# PlatformIO needs the value wrapped in '"..."' so the C preprocessor
+# sees it as a string literal: -DFW_VERSION='"v0.1.x"'
+txt = txt.rstrip() + "\n    -DFW_VERSION='\"" + tag + "\"'\n"
 
 open(path, 'w').write(txt)
 print(f'FW_VERSION set to {tag} in {path}')
