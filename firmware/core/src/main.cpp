@@ -334,7 +334,7 @@ void setupBLE() {
 void setup() {
   Serial.begin(115200);
   delay(500);
-  Serial.println("\n=== InclinoCar Core Unit " FW_VERSION " ===");
+  Serial.println("\n=== InclinoCar Core Unit " + String(FW_VERSION) + " ===");
 
   pinMode(CAL_BUTTON_PIN, INPUT_PULLUP);
 
@@ -454,7 +454,7 @@ void handleSerial() {
 
   // ── version ──
   if (line == "version") {
-    Serial.println("Firmware:  " FW_VERSION);
+    Serial.println("Firmware:  " + String(FW_VERSION));
     Serial.println("Device:    InclinoCar Core Unit");
     return;
   }

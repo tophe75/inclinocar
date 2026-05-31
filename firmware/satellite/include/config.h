@@ -19,4 +19,7 @@
 #define SIGNAL_TIMEOUT_MS   3000
 
 // ─── Firmware version ─────────────────────────────────────────
-// Defined in platformio.ini as build_flag: -DFW_VERSION=\"v0.x.x\"
+// Set via platformio.ini build_flag, falls back if not defined
+#ifndef FW_VERSION
+  #define FW_VERSION "v?.?.?"
+#endif
