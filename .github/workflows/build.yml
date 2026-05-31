@@ -15,9 +15,13 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
       - name: Cache PlatformIO
         uses: actions/cache@v4
+        env:
+          FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
         with:
           path: ~/.platformio
           key: pio-${{ hashFiles('firmware/platformio.ini') }}
@@ -31,6 +35,7 @@ jobs:
           if [[ "$TAG" == v* ]]; then
             sed -i "s/-DFW_VERSION='\"[^\"]*\"'/-DFW_VERSION='\"${TAG}\"'/" firmware/platformio.ini
             echo "Version set to ${TAG}"
+            grep FW_VERSION firmware/platformio.ini
           fi
 
       - name: Build firmware
@@ -42,6 +47,7 @@ jobs:
           cp firmware/.pio/build/esp32-c3-devkitm-1/bootloader.bin docs/bins/
           cp firmware/.pio/build/esp32-c3-devkitm-1/partitions.bin docs/bins/
           cp firmware/.pio/build/esp32-c3-devkitm-1/firmware.bin   docs/bins/
+          ls -lh docs/bins/
 
       - name: Update manifest version
         run: |
@@ -49,6 +55,7 @@ jobs:
           if [[ "$TAG" == v* ]]; then
             VER=${TAG#v}
             sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest.json
+            echo "Manifest version set to ${VER}"
           fi
 
       - name: Commit binaries
@@ -60,9 +67,12 @@ jobs:
           git push origin HEAD:main
 
       - name: Create GitHub Release
-        if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.ref_name }}
+          name: InclinoCar ${{ github.ref_name }}
+          body: |
+            Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge.
           files: |
             docs/bins/bootloader.bin
             docs/bins/partitions.bin
