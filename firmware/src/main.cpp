@@ -104,16 +104,20 @@ void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
 void setupESPNow() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
-  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  esp_err_t ch_err = esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   uint8_t ch; wifi_second_chan_t sc; esp_wifi_get_channel(&ch, &sc);
-  Serial.printf("Core WiFi channel: %d\n", ch);
-  if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW failed"); return; }
-  esp_now_register_recv_cb(onDataReceived);
+  Serial.printf("Core WiFi channel: %d (set_err=%d)\n", ch, ch_err);
+  esp_err_t init_err = esp_now_init();
+  Serial.printf("ESP-NOW init: %d\n", init_err);
+  if (init_err != ESP_OK) { Serial.println("ESP-NOW failed"); return; }
+  esp_err_t cb_err = esp_now_register_recv_cb(onDataReceived);
+  Serial.printf("RX CB registered: %d\n", cb_err);
   uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
   esp_now_peer_info_t bp = {};
   memcpy(bp.peer_addr, broadcast, 6);
   bp.channel = 0;
-  esp_now_add_peer(&bp);
+  esp_err_t peer_err = esp_now_add_peer(&bp);
+  Serial.printf("Broadcast peer added: %d\n", peer_err);
   if (hasSatellite) {
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, satelliteMAC, 6);
