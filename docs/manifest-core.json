@@ -1,6 +1,6 @@
 {
   "name": "InclinoCar Core",
-  "version": "0.0.13",
+  "version": "0.0.14",
   "new_install_prompt_erase": true,
   "builds": [
     {
