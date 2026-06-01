@@ -33,8 +33,7 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           if [[ "$TAG" == v* ]]; then
-            sed -i "s/-DFW_VERSION='\"[^\"]*\"'/-DFW_VERSION='\"${TAG}\"'/" firmware/platformio.ini
-            echo "Version set to ${TAG}"
+            python3 scripts/set_version.py "$TAG" firmware/platformio.ini
             grep FW_VERSION firmware/platformio.ini
           fi
 
@@ -55,7 +54,6 @@ jobs:
           if [[ "$TAG" == v* ]]; then
             VER=${TAG#v}
             sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest.json
-            echo "Manifest version set to ${VER}"
           fi
 
       - name: Commit binaries

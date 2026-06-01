@@ -3,60 +3,119 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_SSD1306.h>
+#include <math.h>
 
-// OLED: SDA=GPIO3, SCL=GPIO4
-// IMU:  SDA=GPIO6, SCL=GPIO7
+// I2C bus: SDA=GPIO6, SCL=GPIO7 (OLED + MPU-6050 shared)
+// Calibration button: GPIO5 → GND (hold 1 second)
+#define SDA_PIN       6
+#define SCL_PIN       7
+#define CAL_BTN_PIN   5
+#define CAL_HOLD_MS   1000
 
-TwoWire i2c0 = TwoWire(0);   // OLED bus
-TwoWire i2c1 = TwoWire(1);   // IMU bus
-
-Adafruit_SSD1306 display(128, 64, &i2c0, -1);
+Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_MPU6050 mpu;
+
+float pitchOffset = 0.0;
+float rollOffset  = 0.0;
+
+bool          btnWasPressed = false;
+unsigned long btnPressTime  = 0;
+
+void calibrate() {
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("  Calibrating...");
+  display.println("  Keep still!");
+  display.display();
+  delay(500);
+
+  float pSum = 0, rSum = 0;
+  for (int i = 0; i < 50; i++) {
+    sensors_event_t a, g, t;
+    mpu.getEvent(&a, &g, &t);
+    pSum += atan2(-a.acceleration.x,
+                  sqrt(a.acceleration.y * a.acceleration.y +
+                       a.acceleration.z * a.acceleration.z)) * 180.0 / PI;
+    rSum += atan2(a.acceleration.y, a.acceleration.z) * 180.0 / PI;
+    delay(20);
+  }
+  pitchOffset = pSum / 50.0;
+  rollOffset  = rSum / 50.0;
+
+  Serial.printf("Cal done. pitch_off=%.2f roll_off=%.2f\n", pitchOffset, rollOffset);
+
+  display.clearDisplay();
+  display.setCursor(0, 0);
+  display.println("  Cal done!");
+  display.printf("  P off: %.1f\n", pitchOffset);
+  display.printf("  R off: %.1f\n", rollOffset);
+  display.display();
+  delay(1500);
+}
+
+void handleButton() {
+  bool pressed = (digitalRead(CAL_BTN_PIN) == LOW);
+  if (pressed && !btnWasPressed) {
+    btnPressTime  = millis();
+    btnWasPressed = true;
+  }
+  if (!pressed && btnWasPressed) {
+    btnWasPressed = false;
+  }
+  if (pressed && btnWasPressed && (millis() - btnPressTime >= CAL_HOLD_MS)) {
+    btnWasPressed = false;
+    calibrate();
+  }
+}
 
 void setup() {
   Serial.begin(115200);
-  delay(100);
-  Serial.println("InclinoCar " FW_VERSION);
+  pinMode(CAL_BTN_PIN, INPUT_PULLUP);
 
-  // Init OLED bus first, then display — pass false to skip internal Wire.begin
-  i2c0.begin(3, 4, 400000);
-  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C, false, false)) {
-    Serial.println("OLED not found");
-  } else {
-    Serial.println("OLED OK");
-    display.clearDisplay();
-    display.setTextColor(SSD1306_WHITE);
-    display.setTextSize(1);
-    display.setCursor(0, 0);
-    display.println("InclinoCar " FW_VERSION);
-    display.println("Starting...");
-    display.display();
-  }
+  Wire.begin(SDA_PIN, SCL_PIN);
 
-  Serial.println("Initialising IMU bus...");
-  i2c1.begin(6, 7, 400000);
-  Serial.println("IMU bus started, scanning 0x68...");
-  if (!mpu.begin(0x68, &i2c1)) {
-    Serial.println("MPU-6050 not found - check GPIO6/7 and AD0=GND");
-    display.println("IMU not found!");
-    display.println("GPIO6=SDA GPIO7=SCL");
-    display.println("AD0 must be GND");
-    display.display();
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println("OLED failed");
+    while (1);
   }
-  Serial.println("MPU-6050 OK");
-  display.println("IMU OK");
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);
+  display.println("  InclinoCar " FW_VERSION);
+  display.println("  Starting...");
   display.display();
-  delay(1000);
+
+  if (!mpu.begin()) {
+    Serial.println("MPU-6050 failed");
+    display.println("  IMU not found!");
+    display.display();
+    while (1);
+  }
+  mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
+  mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
+
+  Serial.println("Ready");
+  display.println("  IMU OK");
+  display.println("  Hold btn to cal");
+  display.display();
+  delay(1500);
 }
 
 void loop() {
+  handleButton();
+
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  float pitch = atan2(a.acceleration.y,  a.acceleration.z) * 180.0 / PI;
-  float roll  = atan2(-a.acceleration.x, a.acceleration.z) * 180.0 / PI;
+  float pitch = atan2(-a.acceleration.x,
+                sqrt(a.acceleration.y * a.acceleration.y +
+                     a.acceleration.z * a.acceleration.z)) * 180.0 / PI - pitchOffset;
+  float roll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0 / PI - rollOffset;
 
-  Serial.printf("Pitch: %+6.1f  Roll: %+6.1f\n", pitch, roll);
+  Serial.printf("P:%+6.1f  R:%+6.1f\n", pitch, roll);
 
   display.clearDisplay();
   display.setTextSize(1);
@@ -77,6 +136,7 @@ void loop() {
   display.setTextSize(1);
   display.print((char)247);
 
+  display.drawLine(0, 54, 127, 54, SSD1306_WHITE);
   display.setCursor(0, 57);
   display.setTextSize(1);
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
