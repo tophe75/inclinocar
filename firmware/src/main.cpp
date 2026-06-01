@@ -46,6 +46,19 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   }
 };
 
+class RxCallbacks : public NimBLECharacteristicCallbacks {
+  void onWrite(NimBLECharacteristic* c) override {
+    std::string val = c->getValue();
+    String cmd = String(val.c_str());
+    cmd.trim();
+    Serial.printf("BLE RX: %s\n", cmd.c_str());
+    if (cmd == "CAL") {
+      extern void calibrate();
+      calibrate();
+    }
+  }
+};
+
 void setupBLE() {
   NimBLEDevice::init("InclinoCar");
   pServer = NimBLEDevice::createServer();
@@ -59,11 +72,12 @@ void setupBLE() {
     NIMBLE_PROPERTY::NOTIFY
   );
 
-  // RX characteristic — phone sends commands to device (not used yet)
-  pService->createCharacteristic(
+  // RX characteristic — phone sends commands to device
+  auto* pRxChar = pService->createCharacteristic(
     NUS_RX_UUID,
     NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
   );
+  pRxChar->setCallbacks(new RxCallbacks());
 
   pService->start();
 
