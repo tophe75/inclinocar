@@ -179,11 +179,9 @@ function updateManifest() {
   const firmware = document.getElementById('firmware-select').value;
   if (!version) return;
 
-  // Point to the manifest for this version/firmware combo
-  // Bins are in docs/bins/ committed by CI — manifest is always current
-  // For version-specific installs we use the GitHub raw URL
-  const base = `https://raw.githubusercontent.com/${REPO}/${version}/docs`;
-  document.getElementById('install-btn').setAttribute('manifest', `${base}/manifest.json`);
+  // Bins are committed to main by CI — always use main branch manifest
+  // The manifest.json on main always points to the latest built bins
+  document.getElementById('install-btn').setAttribute('manifest', 'manifest.json');
   document.getElementById('fw-info').innerHTML = FW_INFO[firmware] || '';
 }
 
