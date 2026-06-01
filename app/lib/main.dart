@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:wakelock_plus/wakelock_plus.dart';
 
 // Nordic UART Service
 const String NUS_SERVICE     = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
@@ -34,6 +35,22 @@ void main() {
 
 class InclinoCarApp extends StatelessWidget {
   const InclinoCarApp({super.key});
+
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();  // Keep screen on by default
+  }
+
+  void _toggleWakeLock() async {
+    final enabled = await WakelockPlus.enabled;
+    if (enabled) {
+      await WakelockPlus.disable();
+    } else {
+      await WakelockPlus.enable();
+    }
+    setState(() => _wakeLock = !enabled);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -71,6 +88,7 @@ class _HomePageState extends State<HomePage> {
 
   bool   _scanning    = false;
   bool   _connected   = false;
+  bool   _wakeLock    = true;
   String _status      = 'Not connected';
 
   // Inclinometer data
@@ -184,7 +202,12 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _sendCalibrate() async {
     if (_rxChar == null) return;
-    await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: true);
+    try {
+      // Try with response first, fall back to without response
+      await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: false);
+    } catch (_) {
+      await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: true);
+    }
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -197,6 +220,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   // ── Build ───────────────────────────────────────────────────
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();  // Keep screen on by default
+  }
+
+  void _toggleWakeLock() async {
+    final enabled = await WakelockPlus.enabled;
+    if (enabled) {
+      await WakelockPlus.disable();
+    } else {
+      await WakelockPlus.enable();
+    }
+    setState(() => _wakeLock = !enabled);
+  }
+
   @override
   Widget build(BuildContext context) {
     final bool level = _pitch.abs() < 1.0 && _roll.abs() < 1.0;
@@ -241,28 +280,51 @@ class _HomePageState extends State<HomePage> {
               style: TextStyle(fontSize: 9, letterSpacing: 2, color: kDim)),
           ],
         ),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: _connected ? kGreenDim.withOpacity(0.3) : kCard,
-            border: Border.all(color: _connected ? kGreen : kBorder),
-            borderRadius: BorderRadius.circular(20),
-          ),
-          child: Row(children: [
-            Container(
-              width: 8, height: 8,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: _connected ? kGreen : kDim,
+        Row(
+          children: [
+            // Wake lock toggle
+            GestureDetector(
+              onTap: _toggleWakeLock,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                margin: const EdgeInsets.only(right: 8),
+                decoration: BoxDecoration(
+                  color: _wakeLock ? kGreenDim.withOpacity(0.2) : kCard,
+                  border: Border.all(color: _wakeLock ? kGreen : kBorder),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  _wakeLock ? Icons.screen_lock_portrait : Icons.screen_lock_portrait_outlined,
+                  size: 16,
+                  color: _wakeLock ? kGreen : kDim,
+                ),
               ),
             ),
-            const SizedBox(width: 6),
-            Text(_connected ? 'Connected' : _status,
-              style: TextStyle(
-                fontSize: 11,
-                color: _connected ? kGreen : kDim,
-              )),
-          ]),
+            // Connection status
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: _connected ? kGreenDim.withOpacity(0.3) : kCard,
+                border: Border.all(color: _connected ? kGreen : kBorder),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Row(children: [
+                Container(
+                  width: 8, height: 8,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: _connected ? kGreen : kDim,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Text(_connected ? 'Connected' : _status,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _connected ? kGreen : kDim,
+                  )),
+              ]),
+            ),
+          ],
         ),
       ],
     );
@@ -414,6 +476,7 @@ class _HomePageState extends State<HomePage> {
     _scanSub?.cancel();
     _dataSub?.cancel();
     _connSub?.cancel();
+    WakelockPlus.disable();
     super.dispose();
   }
 }
@@ -430,6 +493,22 @@ class BubbleLevel extends StatelessWidget {
     required this.roll,
     required this.level,
   });
+
+  @override
+  void initState() {
+    super.initState();
+    WakelockPlus.enable();  // Keep screen on by default
+  }
+
+  void _toggleWakeLock() async {
+    final enabled = await WakelockPlus.enabled;
+    if (enabled) {
+      await WakelockPlus.disable();
+    } else {
+      await WakelockPlus.enable();
+    }
+    setState(() => _wakeLock = !enabled);
+  }
 
   @override
   Widget build(BuildContext context) {
