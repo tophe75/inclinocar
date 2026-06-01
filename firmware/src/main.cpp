@@ -1,5 +1,6 @@
 #include <Arduino.h>
 #include <Wire.h>
+#include <Preferences.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_SSD1306.h>
@@ -14,12 +15,29 @@
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_MPU6050 mpu;
+Preferences prefs;
 
 float pitchOffset = 0.0;
 float rollOffset  = 0.0;
 
 bool          btnWasPressed = false;
 unsigned long btnPressTime  = 0;
+
+void saveOffsets() {
+  prefs.begin("inclinocar", false);
+  prefs.putFloat("pitchOff", pitchOffset);
+  prefs.putFloat("rollOff",  rollOffset);
+  prefs.end();
+  Serial.printf("Offsets saved: pitch=%.2f roll=%.2f\n", pitchOffset, rollOffset);
+}
+
+void loadOffsets() {
+  prefs.begin("inclinocar", true);  // read-only
+  pitchOffset = prefs.getFloat("pitchOff", 0.0);
+  rollOffset  = prefs.getFloat("rollOff",  0.0);
+  prefs.end();
+  Serial.printf("Offsets loaded: pitch=%.2f roll=%.2f\n", pitchOffset, rollOffset);
+}
 
 void calibrate() {
   display.clearDisplay();
@@ -44,11 +62,11 @@ void calibrate() {
   pitchOffset = pSum / 50.0;
   rollOffset  = rSum / 50.0;
 
-  Serial.printf("Cal done. pitch_off=%.2f roll_off=%.2f\n", pitchOffset, rollOffset);
+  saveOffsets();
 
   display.clearDisplay();
   display.setCursor(0, 0);
-  display.println("  Cal done!");
+  display.println("  Cal saved!");
   display.printf("  P off: %.1f\n", pitchOffset);
   display.printf("  R off: %.1f\n", rollOffset);
   display.display();
@@ -97,9 +115,14 @@ void setup() {
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
-  Serial.println("Ready");
+  loadOffsets();
+
   display.println("  IMU OK");
-  display.println("  Hold btn to cal");
+  if (pitchOffset != 0.0 || rollOffset != 0.0) {
+    display.println("  Cal loaded");
+  } else {
+    display.println("  Hold btn to cal");
+  }
   display.display();
   delay(1500);
 }
