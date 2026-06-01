@@ -1,9 +1,10 @@
-name: Build & Deploy
+name: Build Firmware
 
 on:
   push:
     tags:
       - 'v*'
+      - 'fw-v*'
   workflow_dispatch:
 
 jobs:
@@ -28,6 +29,7 @@ jobs:
       - name: Set version from tag
         run: |
           TAG=${GITHUB_REF#refs/tags/}
+          TAG=${TAG#fw-}
           if [[ "$TAG" == v* ]]; then
             python3 scripts/set_version.py "$TAG" firmware/platformio.ini
             grep FW_VERSION firmware/platformio.ini
@@ -42,11 +44,11 @@ jobs:
           cp firmware/.pio/build/esp32-c3-devkitm-1/bootloader.bin docs/bins/
           cp firmware/.pio/build/esp32-c3-devkitm-1/partitions.bin docs/bins/
           cp firmware/.pio/build/esp32-c3-devkitm-1/firmware.bin   docs/bins/
-          ls -lh docs/bins/
 
       - name: Update manifest version
         run: |
           TAG=${GITHUB_REF#refs/tags/}
+          TAG=${TAG#fw-}
           if [[ "$TAG" == v* ]]; then
             VER=${TAG#v}
             sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest.json
@@ -64,7 +66,7 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: InclinoCar ${{ github.ref_name }}
+          name: InclinoCar Firmware ${{ github.ref_name }}
           body: |
             Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge.
           files: |
