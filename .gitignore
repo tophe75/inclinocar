@@ -1,1 +1,16 @@
+# PlatformIO build output
 firmware/.pio/
+firmware-satellite/.pio/
+
+# VS Code
+.vscode/
+firmware/.vscode/
+firmware-satellite/.vscode/
+
+# Old firmware folders (from previous project structure)
+firmware/core/
+firmware/satellite/
+
+# OS
+.DS_Store
+Thumbs.db

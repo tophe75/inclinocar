@@ -48,13 +48,10 @@
       text-transform: uppercase;
       margin-bottom: 28px;
     }
-    .selectors {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 12px;
+    .selector-group {
+      text-align: left;
       margin-bottom: 20px;
     }
-    .selector-group { text-align: left; }
     .selector-group label {
       display: block;
       font-size: 0.75rem;
@@ -86,7 +83,7 @@
       color: var(--dim);
       line-height: 1.7;
       text-align: left;
-      min-height: 60px;
+      min-height: 48px;
     }
     .info strong { color: var(--text); }
     esp-web-install-button { display: block; margin-bottom: 16px; }
@@ -116,24 +113,15 @@
   <div class="logo">INCLINOCAR</div>
   <div class="tagline">Rooftop Tent Leveling System</div>
 
-  <div class="selectors">
-    <div class="selector-group">
-      <label>Version</label>
-      <select id="version-select" onchange="updateManifest()">
-        <option value="">Loading...</option>
-      </select>
-    </div>
-    <div class="selector-group">
-      <label>Firmware</label>
-      <select id="firmware-select" onchange="updateManifest()">
-        <option value="core">Core Unit</option>
-        <option value="satellite">Satellite Display</option>
-      </select>
-    </div>
+  <div class="selector-group">
+    <label>Version</label>
+    <select id="version-select" onchange="updateVersion()">
+      <option value="">Loading...</option>
+    </select>
   </div>
 
   <div class="info" id="fw-info">
-    <strong>Core Unit</strong> — reads MPU-6050 pitch &amp; roll, shows on OLED display.
+    Reads pitch &amp; roll from MPU-6050, displays on OLED. Connect via Bluetooth to the InclinoCar Android app for a full visual display.
   </div>
 
   <esp-web-install-button id="install-btn" manifest="manifest.json">
@@ -144,17 +132,12 @@
 
   <div class="footer">
     <a href="https://github.com/tophe75/inclinocar" target="_blank">github.com/tophe75/inclinocar</a>
-    &nbsp;·&nbsp; Requires Chrome / Edge · Hold BOOT, plug USB, release BOOT
+    &nbsp;·&nbsp; Chrome / Edge only &nbsp;·&nbsp; Hold BOOT → plug USB → release BOOT
   </div>
 </div>
 
 <script>
 const REPO = 'tophe75/inclinocar';
-
-const FW_INFO = {
-  core:      '<strong>Core Unit</strong> — reads MPU-6050, shows pitch &amp; roll on OLED. I2C on GPIO6(SDA)/GPIO7(SCL). Button on GPIO5. Double-press to pair with satellite.',
-  satellite: '<strong>Satellite Display</strong> — shows data from Core Unit wirelessly via ESP-NOW. Same wiring as Core (no IMU needed). Powers up in pairing mode automatically.'
-};
 
 async function loadVersions() {
   try {
@@ -168,21 +151,16 @@ async function loadVersions() {
       opt.text  = r.tag_name + (i === 0 ? ' (latest)' : '');
       sel.appendChild(opt);
     });
-    updateManifest();
+    updateVersion();
   } catch (e) {
-    document.getElementById('version-select').innerHTML = '<option>Could not load</option>';
+    document.getElementById('version-select').innerHTML = '<option value="">Could not load versions</option>';
   }
 }
 
-function updateManifest() {
-  const version  = document.getElementById('version-select').value;
-  const firmware = document.getElementById('firmware-select').value;
+function updateVersion() {
+  const version = document.getElementById('version-select').value;
   if (!version) return;
-
-  // Use firmware-specific manifest
-  const manifest = firmware === 'satellite' ? 'manifest-satellite.json' : 'manifest-core.json';
-  document.getElementById('install-btn').setAttribute('manifest', manifest);
-  document.getElementById('fw-info').innerHTML = FW_INFO[firmware] || '';
+  document.getElementById('install-btn').setAttribute('manifest', 'manifest.json');
 }
 
 loadVersions();

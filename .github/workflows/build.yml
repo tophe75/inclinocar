@@ -12,14 +12,6 @@ jobs:
     permissions:
       contents: write
 
-    strategy:
-      matrix:
-        include:
-          - unit: core
-            dir:  firmware
-          - unit: satellite
-            dir:  firmware-satellite
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,7 +20,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ~/.platformio
-          key: pio-${{ matrix.unit }}-${{ hashFiles(format('{0}/platformio.ini', matrix.dir)) }}
+          key: pio-${{ hashFiles('firmware/platformio.ini') }}
 
       - name: Install PlatformIO
         run: pip install platformio
@@ -37,91 +29,34 @@ jobs:
         run: |
           TAG=${GITHUB_REF#refs/tags/}
           if [[ "$TAG" == v* ]]; then
-            python3 scripts/set_version.py "$TAG" "${{ matrix.dir }}/platformio.ini"
-            grep FW_VERSION "${{ matrix.dir }}/platformio.ini"
+            python3 scripts/set_version.py "$TAG" firmware/platformio.ini
+            grep FW_VERSION firmware/platformio.ini
           fi
 
-      - name: Build ${{ matrix.unit }} firmware
-        run: cd ${{ matrix.dir }} && pio run
+      - name: Build firmware
+        run: cd firmware && pio run
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: bins-${{ matrix.unit }}
-          path: |
-            ${{ matrix.dir }}/.pio/build/esp32-c3-devkitm-1/bootloader.bin
-            ${{ matrix.dir }}/.pio/build/esp32-c3-devkitm-1/partitions.bin
-            ${{ matrix.dir }}/.pio/build/esp32-c3-devkitm-1/firmware.bin
+      - name: Copy binaries to docs/bins
+        run: |
+          mkdir -p docs/bins
+          cp firmware/.pio/build/esp32-c3-devkitm-1/bootloader.bin docs/bins/
+          cp firmware/.pio/build/esp32-c3-devkitm-1/partitions.bin docs/bins/
+          cp firmware/.pio/build/esp32-c3-devkitm-1/firmware.bin   docs/bins/
+          ls -lh docs/bins/
 
-  release:
-    runs-on: ubuntu-latest
-    needs: build
-    permissions:
-      contents: write
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download core bins
-        uses: actions/download-artifact@v4
-        with:
-          name: bins-core
-          path: docs/bins/core
-
-      - name: Download satellite bins
-        uses: actions/download-artifact@v4
-        with:
-          name: bins-satellite
-          path: docs/bins/satellite
-
-      - name: Update manifests
+      - name: Update manifest version
         run: |
           TAG=${GITHUB_REF#refs/tags/}
-          VER=${TAG#v}
-          # Core manifest
-          cat > docs/manifest-core.json << MANIFEST
-          {
-            "name": "InclinoCar Core",
-            "version": "${VER}",
-            "new_install_prompt_erase": true,
-            "builds": [
-              {
-                "chipFamily": "ESP32-C3",
-                "parts": [
-                  { "path": "bins/core/bootloader.bin", "offset": 0 },
-                  { "path": "bins/core/partitions.bin", "offset": 32768 },
-                  { "path": "bins/core/firmware.bin",   "offset": 65536 }
-                ]
-              }
-            ]
-          }
-          MANIFEST
-          # Satellite manifest
-          cat > docs/manifest-satellite.json << MANIFEST
-          {
-            "name": "InclinoCar Satellite",
-            "version": "${VER}",
-            "new_install_prompt_erase": true,
-            "builds": [
-              {
-                "chipFamily": "ESP32-C3",
-                "parts": [
-                  { "path": "bins/satellite/bootloader.bin", "offset": 0 },
-                  { "path": "bins/satellite/partitions.bin", "offset": 32768 },
-                  { "path": "bins/satellite/firmware.bin",   "offset": 65536 }
-                ]
-              }
-            ]
-          }
-          MANIFEST
-          ls -lh docs/bins/core/ docs/bins/satellite/
+          if [[ "$TAG" == v* ]]; then
+            VER=${TAG#v}
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest.json
+          fi
 
-      - name: Commit bins and manifests
+      - name: Commit binaries
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/bins/ docs/manifest-core.json docs/manifest-satellite.json
+          git add docs/bins/ docs/manifest.json
           git diff --staged --quiet || git commit -m "ci: firmware ${GITHUB_REF#refs/tags/}"
           git push origin HEAD:main --force
 
@@ -133,5 +68,6 @@ jobs:
           body: |
             Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge.
           files: |
-            docs/bins/core/firmware.bin
-            docs/bins/satellite/firmware.bin
+            docs/bins/bootloader.bin
+            docs/bins/partitions.bin
+            docs/bins/firmware.bin
