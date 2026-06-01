@@ -102,8 +102,11 @@ void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
 }
 
 void setupESPNow() {
+  WiFi.mode(WIFI_MODE_NULL);
+  delay(100);
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
+  delay(100);
   esp_err_t ch_err = esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   uint8_t ch; wifi_second_chan_t sc; esp_wifi_get_channel(&ch, &sc);
   Serial.printf("Core WiFi channel: %d (set_err=%d)\n", ch, ch_err);
