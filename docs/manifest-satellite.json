@@ -1,0 +1,15 @@
+{
+  "name": "InclinoCar Satellite",
+  "version": "0.0.10",
+  "new_install_prompt_erase": true,
+  "builds": [
+    {
+      "chipFamily": "ESP32-C3",
+      "parts": [
+        { "path": "bins/satellite/bootloader.bin", "offset": 0 },
+        { "path": "bins/satellite/partitions.bin", "offset": 32768 },
+        { "path": "bins/satellite/firmware.bin",   "offset": 65536 }
+      ]
+    }
+  ]
+}
