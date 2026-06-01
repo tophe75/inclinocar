@@ -1,0 +1,66 @@
+name: Build Android App
+
+on:
+  push:
+    tags:
+      - 'v*'
+      - 'app-v*'
+      - 'android-v*'
+  workflow_dispatch:
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.0'
+          channel: 'stable'
+
+      - name: Get version from tag
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          TAG=${TAG#app-}
+          TAG=${TAG#android-}
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+
+      - name: Update app version
+        run: |
+          TAG=${{ steps.version.outputs.tag }}
+          if [[ "$TAG" == v* ]]; then
+            VER=${TAG#v}
+            sed -i "s/^version: .*/version: ${VER}+1/" app/pubspec.yaml
+          fi
+
+      - name: Write local.properties
+        run: |
+          FLUTTER_PATH=$(which flutter | xargs dirname | xargs dirname)
+          echo "flutter.sdk=$FLUTTER_PATH" > app/android/local.properties
+
+      - name: Install dependencies
+        run: cd app && flutter pub get
+
+      - name: Build APK
+        run: cd app && flutter build apk --release
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: InclinoCar Android ${{ github.ref_name }}
+          body: |
+            **Android APK**
+
+            **Install instructions:**
+            1. Download `app-release.apk` below
+            2. On your Android phone: Settings → Security → Install unknown apps → allow your browser
+            3. Open the downloaded APK and tap Install
+          files: app/build/app/outputs/flutter-apk/app-release.apk

@@ -1,13 +1,12 @@
 plugins {
     id "com.android.application"
     id "kotlin-android"
-    id "dev.flutter.flutter-gradle-plugin"
 }
 
 android {
     namespace "com.inclinocar.app"
     compileSdk 34
-    ndkVersion flutter.ndkVersion
+    ndkVersion "25.1.8937393"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -22,8 +21,8 @@ android {
         applicationId "com.inclinocar.app"
         minSdkVersion 23
         targetSdkVersion 34
-        versionCode flutter.versionCode
-        versionName flutter.versionName
+        versionCode 1
+        versionName "1.0.0"
     }
 
     buildTypes {
@@ -31,4 +30,8 @@ android {
     }
 }
 
-flutter { source '../..' }
+dependencies {
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+}
+
+apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
