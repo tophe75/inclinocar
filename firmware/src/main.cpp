@@ -26,8 +26,9 @@ Preferences prefs;
 float pitchOffset = 0.0;
 float rollOffset  = 0.0;
 
-bool          btnWasPressed = false;
-unsigned long btnPressTime  = 0;
+bool          btnWasPressed    = false;
+unsigned long btnPressTime      = 0;
+bool          calibratePending  = false;
 
 // BLE
 NimBLEServer*         pServer  = nullptr;
@@ -53,8 +54,8 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
     cmd.trim();
     Serial.printf("BLE RX: %s\n", cmd.c_str());
     if (cmd == "CAL") {
-      extern void calibrate();
-      calibrate();
+      calibratePending = true;
+      Serial.println("BLE: calibration requested");
     }
   }
 };
@@ -190,6 +191,11 @@ void setup() {
 
 void loop() {
   handleButton();
+
+  if (calibratePending) {
+    calibratePending = false;
+    calibrate();
+  }
 
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
