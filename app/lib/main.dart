@@ -158,18 +158,25 @@ class _HomePageState extends State<HomePage> {
 
       final services = await device.discoverServices();
       for (final s in services) {
-        if (s.serviceUuid.toString().toLowerCase() == NUS_SERVICE) {
+        final sUuid = s.serviceUuid.toString().toLowerCase();
+        if (sUuid == NUS_SERVICE) {
           for (final c in s.characteristics) {
             final uuid = c.characteristicUuid.toString().toLowerCase();
+            debugPrint('Found char: $uuid props: ${c.properties}');
             if (uuid == NUS_TX) {
               _txChar = c;
               await c.setNotifyValue(true);
               _dataSub = c.onValueReceived.listen(_onData);
+              debugPrint('TX char set up');
             }
-            if (uuid == NUS_RX) _rxChar = c;
+            if (uuid == NUS_RX) {
+              _rxChar = c;
+              debugPrint('RX char found');
+            }
           }
         }
       }
+      debugPrint('rxChar: \$_rxChar');
 
       setState(() { _connected = true; _status = 'Connected'; });
     } catch (e) {

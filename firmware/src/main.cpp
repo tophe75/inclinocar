@@ -76,7 +76,7 @@ void setupBLE() {
   // RX characteristic — phone sends commands to device
   auto* pRxChar = pService->createCharacteristic(
     NUS_RX_UUID,
-    NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
+    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
   );
   pRxChar->setCallbacks(new RxCallbacks());
 
