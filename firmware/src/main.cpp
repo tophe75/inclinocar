@@ -79,6 +79,7 @@ void showStatus(const char* l1, const char* l2=nullptr, const char* l3=nullptr) 
 }
 
 void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
+  Serial.printf("RX: len=%d type=%d pairingMode=%d\n", len, len>0?data[0]:0, pairingMode);
   if (len < 1) return;
   if (data[0] == MSG_PAIR_REQ && pairingMode) {
     Serial.printf("Pair req from: %02X:%02X:%02X:%02X:%02X:%02X\n",
@@ -104,6 +105,8 @@ void setupESPNow() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  uint8_t ch; wifi_second_chan_t sc; esp_wifi_get_channel(&ch, &sc);
+  Serial.printf("Core WiFi channel: %d\n", ch);
   if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW failed"); return; }
   esp_now_register_recv_cb(onDataReceived);
   uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};

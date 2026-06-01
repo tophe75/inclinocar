@@ -4,6 +4,7 @@
 #include <esp_now.h>
 #include <esp_wifi.h>
 #include <Preferences.h>
+#include <nvs_flash.h>
 #include <Adafruit_SSD1306.h>
 #include <Adafruit_GFX.h>
 #include "protocol.h"
@@ -66,7 +67,8 @@ void sendPairRequest() {
   req.type = MSG_PAIR_REQ;
   WiFi.macAddress(req.mac);
   uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
-  esp_now_send(broadcast, (uint8_t*)&req, sizeof(req));
+  esp_err_t result = esp_now_send(broadcast, (uint8_t*)&req, sizeof(req));
+  Serial.printf("Pair req sent, result=%d\n", result);
 }
 
 void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
@@ -103,6 +105,8 @@ void setupESPNow() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
+  uint8_t ch; wifi_second_chan_t sc; esp_wifi_get_channel(&ch, &sc);
+  Serial.printf("Satellite WiFi channel: %d\n", ch);
   if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW failed"); return; }
   esp_now_register_recv_cb(onDataReceived);
   // Add broadcast peer for sending pair requests
@@ -154,6 +158,12 @@ void handleButton() {
 
 void setup() {
   Serial.begin(115200);
+  // Initialise NVS flash before using Preferences
+  esp_err_t ret = nvs_flash_init();
+  if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
+    nvs_flash_erase();
+    nvs_flash_init();
+  }
   pinMode(BTN_PIN, INPUT_PULLUP);
   Wire.begin(SDA_PIN, SCL_PIN);
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) { Serial.println("OLED failed"); while(1); }
