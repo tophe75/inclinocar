@@ -2,6 +2,7 @@
 #include <Wire.h>
 #include <WiFi.h>
 #include <esp_now.h>
+#include <esp_wifi.h>
 #include <Preferences.h>
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
@@ -102,12 +103,13 @@ void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
 void setupESPNow() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
+  esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   if (esp_now_init() != ESP_OK) { Serial.println("ESP-NOW failed"); return; }
   esp_now_register_recv_cb(onDataReceived);
   uint8_t broadcast[] = {0xFF,0xFF,0xFF,0xFF,0xFF,0xFF};
   esp_now_peer_info_t bp = {};
   memcpy(bp.peer_addr, broadcast, 6);
-  bp.channel = ESPNOW_CHANNEL;
+  bp.channel = 0;
   esp_now_add_peer(&bp);
   if (hasSatellite) {
     esp_now_peer_info_t peer = {};
