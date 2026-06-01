@@ -219,8 +219,9 @@ void loop() {
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
+  // Left: "InclinoCar vX.X.X"  Right: "BT+" — drawn separately so they never overlap
   display.setCursor(0, 0);
-  display.println("  InclinoCar " FW_VERSION);
+  display.print("InclinoCar " FW_VERSION);
   display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
   display.setTextSize(2);
@@ -239,7 +240,7 @@ void loop() {
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
   display.print(level ? "  ** LEVEL **" : "  Adjust...");
 
-  // BLE indicator top right
+  // BLE indicator — pinned to right edge (128 - 3chars*6px = 110)
   display.setCursor(110, 0);
   display.print(bleConnected ? "BT+" : "BT-");
 
