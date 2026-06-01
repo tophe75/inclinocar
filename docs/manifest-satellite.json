@@ -1,6 +1,6 @@
 {
   "name": "InclinoCar Satellite",
-  "version": "0.0.10",
+  "version": "0.0.11",
   "new_install_prompt_erase": true,
   "builds": [
     {
