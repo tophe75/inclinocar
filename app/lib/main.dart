@@ -22,6 +22,9 @@ const Color kBorder   = Color(0xFF1E3A1E);
 const Color kAmber    = Color(0xFFFFB300);
 const Color kRed      = Color(0xFFEF5350);
 
+// Version from pubspec — updated by CI
+const String kAppVersion = '0.0.8';
+
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
   SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -199,18 +202,22 @@ class _HomePageState extends State<HomePage> {
   }
 
   Future<void> _sendCalibrate() async {
-    if (_rxChar == null) return;
-    try {
-      await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: false);
-    } catch (_) {
-      await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: true);
+    if (_rxChar == null) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Not connected or RX not found'),
+        backgroundColor: kRed, duration: Duration(seconds: 2)));
+      return;
     }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Calibration triggered — keep device still'),
-        backgroundColor: kGreenDim,
-        duration: Duration(seconds: 2),
-      ));
+    try {
+      // NimBLE RX char — try write without response first (more compatible)
+      await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: true);
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Calibrating — keep device still for 2 seconds'),
+        backgroundColor: kGreenDim, duration: Duration(seconds: 3)));
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Cal error: $e'),
+        backgroundColor: kRed, duration: Duration(seconds: 3)));
     }
   }
 
@@ -252,6 +259,8 @@ class _HomePageState extends State<HomePage> {
                 letterSpacing: 6, color: kGreen)),
             Text('ROOFTOP TENT LEVELING',
               style: TextStyle(fontSize: 9, letterSpacing: 2, color: kDim)),
+            Text('v$kAppVersion',
+              style: TextStyle(fontSize: 9, letterSpacing: 1, color: kDim.withOpacity(0.6))),
           ],
         ),
         Row(children: [

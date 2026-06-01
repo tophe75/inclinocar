@@ -108,10 +108,25 @@ Where `p` = pitch and `r` = roll in degrees.
 ```
 firmware/          PlatformIO project (ESP32-C3)
 app/               Flutter app (Android + iOS)
+  app/assets/      App icon and assets
 docs/              GitHub Pages web installer
+3d-print/          STL files for cases and mounting brackets
 scripts/           Build utilities
 .github/workflows/ CI/CD
 ```
+
+## Android App
+
+Download the latest APK from [GitHub Releases](https://github.com/tophe75/inclinocar/releases) and install it on your Android phone.
+
+**Enable unknown sources:**
+Settings → Security → Install unknown apps → allow your browser
+
+The app connects to the device via Bluetooth, shows a live bubble level indicator and pitch/roll readings, and lets you trigger calibration remotely.
+
+## 3D Printed Parts
+
+STL files for cases and mounting brackets are in the `3d-print/` folder. Print in PETG or ABS — avoid PLA as it can warp in a hot car.
 
 ## Building Locally
 

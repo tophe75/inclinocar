@@ -38,6 +38,7 @@ jobs:
           if [[ "$TAG" == v* ]]; then
             VER=${TAG#v}
             sed -i "s/^version: .*/version: ${VER}+1/" app/pubspec.yaml
+            sed -i "s/const String kAppVersion = '[^']*'/const String kAppVersion = '${VER}'/" app/lib/main.dart
           fi
 
       - name: Write local.properties
