@@ -152,8 +152,8 @@
 const REPO = 'tophe75/inclinocar';
 
 const FW_INFO = {
-  core:      '<strong>Core Unit</strong> — reads MPU-6050 pitch &amp; roll, displays on OLED. SDA=GPIO3/SCL=GPIO4 (OLED), SDA=GPIO6/SCL=GPIO7 (IMU).',
-  satellite: '<strong>Satellite Display</strong> — receives data from Core Unit via ESP-NOW and shows on OLED. SDA=GPIO3/SCL=GPIO4.'
+  core:      '<strong>Core Unit</strong> — reads MPU-6050, shows pitch &amp; roll on OLED. I2C on GPIO6(SDA)/GPIO7(SCL). Button on GPIO5. Double-press to pair with satellite.',
+  satellite: '<strong>Satellite Display</strong> — shows data from Core Unit wirelessly via ESP-NOW. Same wiring as Core (no IMU needed). Powers up in pairing mode automatically.'
 };
 
 async function loadVersions() {
@@ -179,9 +179,9 @@ function updateManifest() {
   const firmware = document.getElementById('firmware-select').value;
   if (!version) return;
 
-  // Bins are committed to main by CI — always use main branch manifest
-  // The manifest.json on main always points to the latest built bins
-  document.getElementById('install-btn').setAttribute('manifest', 'manifest.json');
+  // Use firmware-specific manifest
+  const manifest = firmware === 'satellite' ? 'manifest-satellite.json' : 'manifest-core.json';
+  document.getElementById('install-btn').setAttribute('manifest', manifest);
   document.getElementById('fw-info').innerHTML = FW_INFO[firmware] || '';
 }
 

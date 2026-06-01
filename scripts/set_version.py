@@ -11,12 +11,13 @@ path = sys.argv[2]
 txt = open(path).read()
 
 # Remove any existing FW_VERSION line
-txt = re.sub(r"[ \t]*-DFW_VERSION=[^\n]*\n", '', txt)
+txt = re.sub(r'[ \t]*-DFW_VERSION=[^\n]*\n', '', txt)
 
-# Insert inside build_flags after the last existing flag line
+# Insert inside build_flags — format must be -DFW_VERSION='"vX.X.X"'
+# The single quotes wrap double quotes so C preprocessor sees a string literal
 txt = re.sub(
-    r"(build_flags\s*=(?:\s*\n[ \t]+-[^\n]+)+)",
-    lambda m: m.group(0) + "\n    -DFW_VERSION='\"" + tag + "\"'",
+    r'(build_flags\s*=(?:\s*\n[ \t]+-[^\n]+)+)',
+    lambda m: m.group(0) + '\n    -DFW_VERSION=\'"' + tag + '"\'',
     txt
 )
 
