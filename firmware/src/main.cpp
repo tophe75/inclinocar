@@ -89,7 +89,7 @@ void onDataReceived(const uint8_t* mac, const uint8_t* data, int len) {
     saveSatelliteMAC();
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, satelliteMAC, 6);
-    peer.channel = ESPNOW_CHANNEL;
+    peer.channel = 0;
     if (!esp_now_is_peer_exist(satelliteMAC)) esp_now_add_peer(&peer);
     PairPacket ack;
     ack.type = MSG_PAIR_ACK;
@@ -107,9 +107,8 @@ void setupESPNow() {
   WiFi.mode(WIFI_STA);
   WiFi.disconnect();
   delay(100);
-  esp_err_t ch_err = esp_wifi_set_channel(ESPNOW_CHANNEL, WIFI_SECOND_CHAN_NONE);
   uint8_t ch; wifi_second_chan_t sc; esp_wifi_get_channel(&ch, &sc);
-  Serial.printf("Core WiFi channel: %d (set_err=%d)\n", ch, ch_err);
+  Serial.printf("Core WiFi channel: %d\n", ch);
   esp_err_t init_err = esp_now_init();
   Serial.printf("ESP-NOW init: %d\n", init_err);
   if (init_err != ESP_OK) { Serial.println("ESP-NOW failed"); return; }
@@ -124,7 +123,7 @@ void setupESPNow() {
   if (hasSatellite) {
     esp_now_peer_info_t peer = {};
     memcpy(peer.peer_addr, satelliteMAC, 6);
-    peer.channel = ESPNOW_CHANNEL;
+    peer.channel = 0;
     esp_now_add_peer(&peer);
   }
   Serial.print("Core MAC: "); Serial.println(WiFi.macAddress());
