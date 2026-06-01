@@ -1,15 +1,8 @@
-def localProperties = new Properties()
-def localPropertiesFile = rootProject.file('local.properties')
-if (localPropertiesFile.exists()) {
-    localPropertiesFile.withReader('UTF-8') { reader -> localProperties.load(reader) }
+plugins {
+    id "com.android.application"
+    id "kotlin-android"
+    id "dev.flutter.flutter-gradle-plugin"
 }
-
-def flutterRoot = localProperties.getProperty('flutter.sdk')
-assert flutterRoot != null, "flutter.sdk not set in local.properties"
-
-apply plugin: 'com.android.application'
-apply plugin: 'kotlin-android'
-apply from: "$flutterRoot/packages/flutter_tools/gradle/flutter.gradle"
 
 android {
     namespace "com.inclinocar.app"
@@ -21,16 +14,14 @@ android {
         targetCompatibility JavaVersion.VERSION_1_8
     }
 
-    kotlinOptions { jvmTarget = '1.8' }
-
-    sourceSets { main.java.srcDirs += 'src/main/kotlin' }
+    kotlinOptions { jvmTarget = "1.8" }
 
     defaultConfig {
         applicationId "com.inclinocar.app"
-        minSdkVersion 23
-        targetSdkVersion 35
-        versionCode 1
-        versionName "1.0.0"
+        minSdk 23
+        targetSdk 35
+        versionCode flutter.versionCode
+        versionName flutter.versionName
     }
 
     buildTypes {
@@ -39,9 +30,5 @@ android {
 }
 
 flutter {
-    source '../..'
-}
-
-dependencies {
-    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.0"
+    source "../.."
 }
