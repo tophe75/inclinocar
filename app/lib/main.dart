@@ -5,11 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:wakelock_plus/wakelock_plus.dart';
 
 // Nordic UART Service
 const String NUS_SERVICE     = '6e400001-b5a3-f393-e0a9-e50e24dcca9e';
 const String NUS_TX          = '6e400003-b5a3-f393-e0a9-e50e24dcca9e'; // device→phone
+const MethodChannel _wakelockChannel = MethodChannel('com.inclinocar/wakelock');
+
 const String NUS_RX          = '6e400002-b5a3-f393-e0a9-e50e24dcca9e'; // phone→device
 
 // ─── Theme ───────────────────────────────────────────────────
@@ -39,17 +40,16 @@ class InclinoCarApp extends StatelessWidget {
   @override
   void initState() {
     super.initState();
-    WakelockPlus.enable();  // Keep screen on by default
+    _wakelockChannel.invokeMethod('enable');  // Keep screen on by default
   }
 
   void _toggleWakeLock() async {
-    final enabled = await WakelockPlus.enabled;
-    if (enabled) {
-      await WakelockPlus.disable();
+    if (_wakeLock) {
+      await _wakelockChannel.invokeMethod('disable');
     } else {
-      await WakelockPlus.enable();
+      await _wakelockChannel.invokeMethod('enable');
     }
-    setState(() => _wakeLock = !enabled);
+    setState(() => _wakeLock = !_wakeLock);
   }
 
   @override
@@ -223,17 +223,16 @@ class _HomePageState extends State<HomePage> {
   @override
   void initState() {
     super.initState();
-    WakelockPlus.enable();  // Keep screen on by default
+    _wakelockChannel.invokeMethod('enable');  // Keep screen on by default
   }
 
   void _toggleWakeLock() async {
-    final enabled = await WakelockPlus.enabled;
-    if (enabled) {
-      await WakelockPlus.disable();
+    if (_wakeLock) {
+      await _wakelockChannel.invokeMethod('disable');
     } else {
-      await WakelockPlus.enable();
+      await _wakelockChannel.invokeMethod('enable');
     }
-    setState(() => _wakeLock = !enabled);
+    setState(() => _wakeLock = !_wakeLock);
   }
 
   @override
@@ -476,7 +475,7 @@ class _HomePageState extends State<HomePage> {
     _scanSub?.cancel();
     _dataSub?.cancel();
     _connSub?.cancel();
-    WakelockPlus.disable();
+    _wakelockChannel.invokeMethod('disable');
     super.dispose();
   }
 }
@@ -497,17 +496,16 @@ class BubbleLevel extends StatelessWidget {
   @override
   void initState() {
     super.initState();
-    WakelockPlus.enable();  // Keep screen on by default
+    _wakelockChannel.invokeMethod('enable');  // Keep screen on by default
   }
 
   void _toggleWakeLock() async {
-    final enabled = await WakelockPlus.enabled;
-    if (enabled) {
-      await WakelockPlus.disable();
+    if (_wakeLock) {
+      await _wakelockChannel.invokeMethod('disable');
     } else {
-      await WakelockPlus.enable();
+      await _wakelockChannel.invokeMethod('enable');
     }
-    setState(() => _wakeLock = !enabled);
+    setState(() => _wakeLock = !_wakeLock);
   }
 
   @override
