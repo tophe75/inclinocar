@@ -355,7 +355,7 @@ class _HomePageState extends State<HomePage> {
           style: TextStyle(fontSize: 10, letterSpacing: 2, color: kDim)),
         const SizedBox(height: 12),
         Expanded(child: Center(
-          child: BubbleLevel(pitch: _pitch, roll: _roll, level: level),
+          child: BubbleLevel(pitch: -_pitch, roll: -_roll, level: level),
         )),
         const SizedBox(height: 12),
         Container(
