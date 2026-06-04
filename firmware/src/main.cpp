@@ -23,8 +23,11 @@ Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_MPU6050 mpu;
 Preferences prefs;
 
-float pitchOffset = 0.0;
-float rollOffset  = 0.0;
+float pitchOffset    = 0.0;
+float rollOffset     = 0.0;
+float smoothedPitch  = 0.0;
+float smoothedRoll   = 0.0;
+const float ALPHA    = 0.15f;  // lower = smoother, higher = more responsive
 
 bool          btnWasPressed    = false;
 unsigned long btnPressTime      = 0;
@@ -117,10 +120,13 @@ void calibrate() {
   for (int i = 0; i < 50; i++) {
     sensors_event_t a, g, t;
     mpu.getEvent(&a, &g, &t);
-    pSum += atan2(-a.acceleration.x,
+    float rp = atan2(-a.acceleration.x,
                   sqrt(a.acceleration.y*a.acceleration.y +
                        a.acceleration.z*a.acceleration.z)) * 180.0/PI;
-    rSum += atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
+    float rr = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
+    // Apply same CCW 90 rotation
+    pSum += rr;
+    rSum += -rp;
     delay(20);
   }
   pitchOffset = pSum / 50.0;
@@ -200,10 +206,22 @@ void loop() {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  float pitch = atan2(-a.acceleration.x,
-                sqrt(a.acceleration.y*a.acceleration.y +
-                     a.acceleration.z*a.acceleration.z)) * 180.0/PI - pitchOffset;
-  float roll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI - rollOffset;
+  // Raw axis values
+  float rawPitch = atan2(-a.acceleration.x,
+                   sqrt(a.acceleration.y*a.acceleration.y +
+                        a.acceleration.z*a.acceleration.z)) * 180.0/PI - pitchOffset;
+  float rawRoll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI - rollOffset;
+
+  // Rotate axes CCW 90 degrees: pitch becomes roll, roll becomes -pitch
+  float rotPitch = rawRoll;
+  float rotRoll  = -rawPitch;
+
+  // Exponential moving average to reduce jitter
+  smoothedPitch = ALPHA * rotPitch + (1.0f - ALPHA) * smoothedPitch;
+  smoothedRoll  = ALPHA * rotRoll  + (1.0f - ALPHA) * smoothedRoll;
+
+  float pitch = smoothedPitch;
+  float roll  = smoothedRoll;
 
   // Send JSON over BLE NUS
   if (bleConnected) {
@@ -226,12 +244,12 @@ void loop() {
 
   display.setTextSize(2);
   display.setCursor(0, 16);
-  display.printf("P%+6.1f", pitch);
+  display.printf("P%6.1f", pitch);
   display.setTextSize(1); display.print((char)247);
 
   display.setTextSize(2);
   display.setCursor(0, 38);
-  display.printf("R%+6.1f", roll);
+  display.printf("R%6.1f", roll);
   display.setTextSize(1); display.print((char)247);
 
   display.drawLine(0, 54, 127, 54, SSD1306_WHITE);
@@ -240,9 +258,11 @@ void loop() {
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
   display.print(level ? "  ** LEVEL **" : "  Adjust...");
 
-  // BLE indicator — pinned to right edge (128 - 3chars*6px = 110)
-  display.setCursor(110, 0);
-  display.print(bleConnected ? "BT+" : "BT-");
+  // BT indicator — only show when connected, pinned to right edge
+  if (bleConnected) {
+    display.setCursor(116, 0);
+    display.print("BT");
+  }
 
   display.display();
   delay(100);
