@@ -22,7 +22,7 @@ const Color kBorder   = Color(0xFF1E3A1E);
 const Color kAmber    = Color(0xFFFFB300);
 const Color kRed      = Color(0xFFEF5350);
 
-const String kAppVersion = '0.0.11';
+const String kAppVersion = '0.0.13';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -581,41 +581,105 @@ class BubbleLevel extends StatelessWidget {
     return LayoutBuilder(builder: (context, constraints) {
       final size   = min(constraints.maxWidth, constraints.maxHeight);
       final radius = size / 2;
-      final maxOff = radius * 0.65;
+      final maxOff = radius * 0.60;
       final dx = (roll  / 15.0).clamp(-1.0, 1.0) * maxOff;
       final dy = (pitch / 15.0).clamp(-1.0, 1.0) * maxOff;
       return SizedBox(width: size, height: size,
         child: CustomPaint(
           painter: _BubblePainter(
             dx: dx, dy: dy, radius: radius,
+            pitch: pitch, roll: roll,
             bubbleColor: level ? kGreen : kAmber, level: level)));
     });
   }
 }
 
 class _BubblePainter extends CustomPainter {
-  final double dx, dy, radius;
+  final double dx, dy, radius, pitch, roll;
   final Color  bubbleColor;
   final bool   level;
   _BubblePainter({required this.dx, required this.dy, required this.radius,
+    required this.pitch, required this.roll,
     required this.bubbleColor, required this.level});
+
+  void _drawArrow(Canvas canvas, Offset tip, Offset base1, Offset base2, Color color) {
+    final path = Path()..moveTo(tip.dx, tip.dy)
+      ..lineTo(base1.dx, base1.dy)..lineTo(base2.dx, base2.dy)..close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  void _drawCar(Canvas canvas, double cx, double cy, double r) {
+    final paint = Paint()
+      ..color = kGreen.withOpacity(0.25)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.5;
+
+    final carW = r * 0.28;
+    final carH = r * 0.72;
+
+    // Body
+    final body = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx, cy), width: carW * 2, height: carH * 2),
+      Radius.circular(carW * 0.7));
+    canvas.drawRRect(body, paint);
+
+    // Windscreen
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy - carH * 0.52),
+          width: carW * 1.5, height: carH * 0.28),
+        Radius.circular(4)),
+      Paint()..color = kGreen.withOpacity(0.15)..style = PaintingStyle.fill);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy - carH * 0.52),
+          width: carW * 1.5, height: carH * 0.28),
+        Radius.circular(4)),
+      paint);
+
+    // Rear window
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromCenter(center: Offset(cx, cy + carH * 0.44),
+          width: carW * 1.3, height: carH * 0.2),
+        Radius.circular(3)),
+      paint);
+
+    // Wheels — all four
+    for (final pos in [
+      Offset(cx - carW * 1.25, cy - carH * 0.5),
+      Offset(cx + carW * 1.25, cy - carH * 0.5),
+      Offset(cx - carW * 1.25, cy + carH * 0.4),
+      Offset(cx + carW * 1.25, cy + carH * 0.4),
+    ]) {
+      canvas.drawRRect(
+        RRect.fromRectAndRadius(
+          Rect.fromCenter(center: pos, width: carW * 0.45, height: carH * 0.22),
+          Radius.circular(3)),
+        Paint()..color = kGreen.withOpacity(0.3)..style = PaintingStyle.fill);
+    }
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final cx = size.width / 2;
     final cy = size.height / 2;
 
+    // Outer circle
     canvas.drawCircle(Offset(cx, cy), radius - 2,
       Paint()..style = PaintingStyle.stroke..color = kBorder..strokeWidth = 1.5);
+    // Inner rings
     canvas.drawCircle(Offset(cx, cy), radius * 0.12,
       Paint()..style = PaintingStyle.stroke..color = kGreen.withOpacity(0.4)..strokeWidth = 1);
     canvas.drawCircle(Offset(cx, cy), radius * 0.28,
       Paint()..style = PaintingStyle.stroke..color = kBorder..strokeWidth = 1);
 
+    // Crosshair
     final hair = Paint()..color = kBorder..strokeWidth = 1;
     canvas.drawLine(Offset(cx - radius + 8, cy), Offset(cx + radius - 8, cy), hair);
     canvas.drawLine(Offset(cx, cy - radius + 8), Offset(cx, cy + radius - 8), hair);
 
+    // Tick marks
     final tick = Paint()..color = kDim..strokeWidth = 1.5;
     for (int i = 0; i < 4; i++) {
       final a = i * pi / 2;
@@ -624,20 +688,85 @@ class _BubblePainter extends CustomPainter {
         Offset(cx + (radius-2) *cos(a), cy + (radius-2) *sin(a)), tick);
     }
 
-    canvas.drawCircle(Offset(cx+dx+1, cy+dy+1), radius*0.18,
+    // Car silhouette
+    _drawCar(canvas, cx, cy, radius);
+
+    // FRONT label
+    final textPainter = TextPainter(
+      text: TextSpan(text: 'FRONT',
+        style: TextStyle(color: kDim.withOpacity(0.7), fontSize: 9,
+          fontFamily: 'monospace', letterSpacing: 1)),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    textPainter.paint(canvas,
+      Offset(cx - textPainter.width / 2, cy - radius + 2));
+
+    // Directional arrows — light up when off level
+    final double threshold = 1.0;
+    final arrowR  = radius + 14;
+    final arrowSz = 8.0;
+
+    // pitch > 0 = front high → lower front (arrow points down = rear)
+    // pitch < 0 = front low → raise front (arrow points up = front)
+    // roll  > 0 = right high → lower right
+    // roll  < 0 = left high  → lower left
+
+    final frontActive = pitch < -threshold;
+    final rearActive  = pitch >  threshold;
+    final rightActive = roll  > -threshold && roll < -threshold ? false : roll < -threshold;
+    final leftActive  = roll  >  threshold;
+
+    // Top arrow (raise front)
+    final topColor = frontActive ? kAmber : kBorder;
+    _drawArrow(canvas,
+      Offset(cx, cy - arrowR),
+      Offset(cx - arrowSz, cy - arrowR + arrowSz * 1.4),
+      Offset(cx + arrowSz, cy - arrowR + arrowSz * 1.4),
+      topColor);
+
+    // Bottom arrow (raise rear / lower front)
+    final botColor = rearActive ? kAmber : kBorder;
+    _drawArrow(canvas,
+      Offset(cx, cy + arrowR),
+      Offset(cx - arrowSz, cy + arrowR - arrowSz * 1.4),
+      Offset(cx + arrowSz, cy + arrowR - arrowSz * 1.4),
+      botColor);
+
+    // Right arrow
+    final rightColor = rightActive ? kAmber : kBorder;
+    _drawArrow(canvas,
+      Offset(cx + arrowR, cy),
+      Offset(cx + arrowR - arrowSz * 1.4, cy - arrowSz),
+      Offset(cx + arrowR - arrowSz * 1.4, cy + arrowSz),
+      rightColor);
+
+    // Left arrow
+    final leftColor = leftActive ? kAmber : kBorder;
+    _drawArrow(canvas,
+      Offset(cx - arrowR, cy),
+      Offset(cx - arrowR + arrowSz * 1.4, cy - arrowSz),
+      Offset(cx - arrowR + arrowSz * 1.4, cy + arrowSz),
+      leftColor);
+
+    // Bubble shadow
+    canvas.drawCircle(Offset(cx+dx+1, cy+dy+1), radius*0.16,
       Paint()..color = Colors.black.withOpacity(0.3));
-    canvas.drawCircle(Offset(cx+dx, cy+dy), radius*0.18,
+    // Bubble fill
+    canvas.drawCircle(Offset(cx+dx, cy+dy), radius*0.16,
       Paint()..shader = RadialGradient(
         colors: [bubbleColor.withOpacity(0.9), bubbleColor.withOpacity(0.5)],
-      ).createShader(Rect.fromCircle(center: Offset(cx+dx, cy+dy), radius: radius*0.18)));
-    canvas.drawCircle(Offset(cx+dx, cy+dy), radius*0.18,
+      ).createShader(Rect.fromCircle(center: Offset(cx+dx, cy+dy), radius: radius*0.16)));
+    // Bubble outline
+    canvas.drawCircle(Offset(cx+dx, cy+dy), radius*0.16,
       Paint()..style = PaintingStyle.stroke..color = bubbleColor..strokeWidth = 1.5);
+    // Bubble glint
     canvas.drawCircle(
-      Offset(cx+dx - radius*0.05, cy+dy - radius*0.05), radius*0.06,
-      Paint()..color = Colors.white.withOpacity(0.3));
+      Offset(cx+dx - radius*0.05, cy+dy - radius*0.05), radius*0.055,
+      Paint()..color = Colors.white.withOpacity(0.35));
   }
 
   @override
   bool shouldRepaint(_BubblePainter old) =>
-    dx != old.dx || dy != old.dy || level != old.level;
+    dx != old.dx || dy != old.dy || level != old.level ||
+    pitch != old.pitch || roll != old.roll;
 }
