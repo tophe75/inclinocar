@@ -124,9 +124,9 @@ void calibrate() {
                   sqrt(a.acceleration.y*a.acceleration.y +
                        a.acceleration.z*a.acceleration.z)) * 180.0/PI;
     float rr = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
-    // Apply same CCW 90 rotation
-    pSum += rr;
-    rSum += -rp;
+    // Apply same CW 90 rotation
+    pSum += -rr;
+    rSum +=  rp;
     delay(20);
   }
   pitchOffset = pSum / 50.0;
@@ -206,15 +206,15 @@ void loop() {
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
 
-  // Raw axis values
+  // Raw axis values (no offset yet)
   float rawPitch = atan2(-a.acceleration.x,
                    sqrt(a.acceleration.y*a.acceleration.y +
-                        a.acceleration.z*a.acceleration.z)) * 180.0/PI - pitchOffset;
-  float rawRoll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI - rollOffset;
+                        a.acceleration.z*a.acceleration.z)) * 180.0/PI;
+  float rawRoll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
 
-  // Rotate axes CCW 90 degrees: pitch becomes roll, roll becomes -pitch
-  float rotPitch = rawRoll;
-  float rotRoll  = -rawPitch;
+  // Rotate axes CW 90 degrees then apply calibration offsets
+  float rotPitch = -rawRoll  - pitchOffset;
+  float rotRoll  =  rawPitch - rollOffset;
 
   // Exponential moving average to reduce jitter
   smoothedPitch = ALPHA * rotPitch + (1.0f - ALPHA) * smoothedPitch;
