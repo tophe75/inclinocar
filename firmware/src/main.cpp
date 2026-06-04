@@ -60,6 +60,8 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   }
 };
 
+void saveNickname();  // forward declaration
+
 class RxCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c) override {
     std::string val = c->getValue();
