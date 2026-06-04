@@ -711,8 +711,8 @@ class _BubblePainter extends CustomPainter {
     // roll  > 0 = right high → lower right
     // roll  < 0 = left high  → lower left
 
-    final frontActive = pitch < -threshold;
-    final rearActive  = pitch >  threshold;
+    final frontActive = pitch >  threshold;
+    final rearActive  = pitch < -threshold;
     final rightActive = roll  > -threshold && roll < -threshold ? false : roll < -threshold;
     final leftActive  = roll  >  threshold;
 
