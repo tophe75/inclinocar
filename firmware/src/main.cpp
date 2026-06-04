@@ -19,6 +19,9 @@
 #define NUS_RX_UUID       "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  // phone → device
 #define NUS_TX_UUID       "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // device → phone
 
+// Device nickname (user settable)
+char deviceNickname[32] = "InclinoCore";
+
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_MPU6050 mpu;
 Preferences prefs;
@@ -66,12 +69,20 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
     if (cmd == "CAL") {
       calibratePending = true;
       Serial.println("BLE: calibration requested");
+    } else if (cmd.startsWith("NICK:")) {
+      String nick = cmd.substring(5);
+      nick.trim();
+      if (nick.length() > 0 && nick.length() < 32) {
+        nick.toCharArray(deviceNickname, sizeof(deviceNickname));
+        saveNickname();
+        Serial.printf("BLE: nickname set to %s\n", deviceNickname);
+      }
     }
   }
 };
 
 void setupBLE() {
-  NimBLEDevice::init("InclinoCar");
+  NimBLEDevice::init("InclinoCore");
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
 
@@ -103,6 +114,22 @@ void saveBrightness() {
   prefs.begin("inclinocar", false);
   prefs.putInt("brightness", brightnessIndex);
   prefs.end();
+}
+
+void saveNickname() {
+  prefs.begin("inclinocar", false);
+  prefs.putString("nickname", deviceNickname);
+  prefs.end();
+  // Update BLE advertising name
+  NimBLEDevice::setDeviceName(deviceNickname);
+}
+
+void loadNickname() {
+  prefs.begin("inclinocar", true);
+  String saved = prefs.getString("nickname", "InclinoCore");
+  prefs.end();
+  saved.toCharArray(deviceNickname, sizeof(deviceNickname));
+  Serial.printf("Nickname: %s\n", deviceNickname);
 }
 
 void saveOffsets() {
@@ -237,7 +264,7 @@ void setup() {
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
-  display.setCursor(0, 0);  display.println("  InclinoCar");
+  display.setCursor(0, 0);  display.println(deviceNickname);
   display.setCursor(0, 12); display.println("  " FW_VERSION);
   display.setCursor(0, 28); display.println("  Starting...");
   display.display();
@@ -295,8 +322,8 @@ void loop() {
 
   // Send JSON over BLE NUS
   if (bleConnected) {
-    char buf[64];
-    snprintf(buf, sizeof(buf), "{\"p\":%.1f,\"r\":%.1f}\n", pitch, roll);
+    char buf[96];
+    snprintf(buf, sizeof(buf), "{\"p\":%.1f,\"r\":%.1f,\"n\":\"%s\"}\n", pitch, roll, deviceNickname);
     pTxChar->setValue((uint8_t*)buf, strlen(buf));
     pTxChar->notify();
   }
@@ -309,7 +336,7 @@ void loop() {
   display.setTextColor(SSD1306_WHITE);
   // Left: "InclinoCar vX.X.X"  Right: "BT+" — drawn separately so they never overlap
   display.setCursor(0, 0);
-  display.print("InclinoCar " FW_VERSION);
+  display.print(deviceNickname);
   display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
 
   display.setTextSize(2);

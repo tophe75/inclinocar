@@ -22,8 +22,7 @@ const Color kBorder   = Color(0xFF1E3A1E);
 const Color kAmber    = Color(0xFFFFB300);
 const Color kRed      = Color(0xFFEF5350);
 
-// Version from pubspec — updated by CI
-const String kAppVersion = '0.0.8';
+const String kAppVersion = '0.0.11';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();
@@ -45,10 +44,7 @@ class InclinoCarApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: kBg,
-        colorScheme: const ColorScheme.dark(
-          primary: kGreen,
-          surface: kCard,
-        ),
+        colorScheme: const ColorScheme.dark(primary: kGreen, surface: kCard),
       ),
       home: const HomePage(),
     );
@@ -57,23 +53,25 @@ class InclinoCarApp extends StatelessWidget {
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
-
   @override
   State<HomePage> createState() => _HomePageState();
 }
 
 class _HomePageState extends State<HomePage> {
+  // BLE
   BluetoothDevice?         _device;
   BluetoothCharacteristic? _txChar;
   BluetoothCharacteristic? _rxChar;
   StreamSubscription?      _scanSub;
   StreamSubscription?      _dataSub;
   StreamSubscription?      _connSub;
+  String?                  _knownMac;  // last connected MAC for auto-reconnect
 
   bool   _scanning  = false;
   bool   _connected = false;
   bool   _wakeLock  = true;
   String _status    = 'Not connected';
+  String _nickname  = 'InclinoCore';
 
   double _pitch = 0.0;
   double _roll  = 0.0;
@@ -110,18 +108,23 @@ class _HomePageState extends State<HomePage> {
     ].request();
   }
 
-  Future<void> _startScan() async {
+  // Auto-connect: tries known MAC first, falls back to name scan
+  Future<void> _autoConnect() async {
     await _requestPermissions();
     setState(() { _scanning = true; _status = 'Scanning...'; });
 
     await FlutterBluePlus.startScan(
-      withNames: ['InclinoCar'],
+      withNames: ['InclinoCore'],
       timeout: const Duration(seconds: 10),
     );
 
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
-        if (r.device.platformName == 'InclinoCar') {
+        // Prefer known MAC, accept any InclinoCore otherwise
+        final macMatch = _knownMac != null &&
+            r.device.remoteId.toString() == _knownMac;
+        final nameMatch = r.device.platformName == 'InclinoCore';
+        if (macMatch || nameMatch) {
           FlutterBluePlus.stopScan();
           _connect(r.device);
           break;
@@ -130,16 +133,75 @@ class _HomePageState extends State<HomePage> {
     });
 
     FlutterBluePlus.isScanning.listen((scanning) {
-      if (!scanning && mounted) {
-        setState(() => _scanning = false);
-        if (!_connected) setState(() => _status = 'Device not found');
+      if (!scanning && mounted && !_connected) {
+        setState(() { _scanning = false; _status = 'Device not found'; });
       }
     });
+  }
+
+  // Manual scan — shows all InclinoCore devices to pick from
+  Future<void> _manualScan() async {
+    await _requestPermissions();
+    final found = <ScanResult>[];
+
+    setState(() => _scanning = true);
+
+    await FlutterBluePlus.startScan(
+      withNames: ['InclinoCore'],
+      timeout: const Duration(seconds: 8),
+    );
+
+    await for (final results in FlutterBluePlus.scanResults) {
+      for (final r in results) {
+        if (!found.any((e) => e.device.remoteId == r.device.remoteId)) {
+          found.add(r);
+        }
+      }
+    }
+
+    setState(() => _scanning = false);
+    if (!mounted) return;
+
+    if (found.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('No InclinoCore devices found'),
+        backgroundColor: kRed,
+      ));
+      return;
+    }
+
+    // Show picker
+    final picked = await showDialog<BluetoothDevice>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCard,
+        title: const Text('Select InclinoCore',
+          style: TextStyle(color: kText, fontSize: 16)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: found.map((r) => ListTile(
+            title: Text(r.device.platformName,
+              style: const TextStyle(color: kText)),
+            subtitle: Text(r.device.remoteId.toString(),
+              style: TextStyle(color: kDim, fontSize: 11)),
+            trailing: Text('${r.rssi} dBm',
+              style: TextStyle(color: kDim, fontSize: 11)),
+            onTap: () => Navigator.pop(ctx, r.device),
+          )).toList(),
+        ),
+      ),
+    );
+
+    if (picked != null) {
+      _knownMac = picked.remoteId.toString();
+      _connect(picked);
+    }
   }
 
   Future<void> _connect(BluetoothDevice device) async {
     setState(() => _status = 'Connecting...');
     _device = device;
+    _knownMac = device.remoteId.toString();
 
     try {
       await device.connect(timeout: const Duration(seconds: 10));
@@ -151,6 +213,7 @@ class _HomePageState extends State<HomePage> {
             _status    = 'Disconnected';
             _pitch     = 0.0;
             _roll      = 0.0;
+            _nickname  = 'InclinoCore';
           });
           _dataSub?.cancel();
         }
@@ -158,25 +221,18 @@ class _HomePageState extends State<HomePage> {
 
       final services = await device.discoverServices();
       for (final s in services) {
-        final sUuid = s.serviceUuid.toString().toLowerCase();
-        if (sUuid == NUS_SERVICE) {
+        if (s.serviceUuid.toString().toLowerCase() == NUS_SERVICE) {
           for (final c in s.characteristics) {
             final uuid = c.characteristicUuid.toString().toLowerCase();
-            debugPrint('Found char: $uuid props: ${c.properties}');
             if (uuid == NUS_TX) {
               _txChar = c;
               await c.setNotifyValue(true);
               _dataSub = c.onValueReceived.listen(_onData);
-              debugPrint('TX char set up');
             }
-            if (uuid == NUS_RX) {
-              _rxChar = c;
-              debugPrint('RX char found');
-            }
+            if (uuid == NUS_RX) _rxChar = c;
           }
         }
       }
-      debugPrint('rxChar: \$_rxChar');
 
       setState(() { _connected = true; _status = 'Connected'; });
     } catch (e) {
@@ -194,6 +250,7 @@ class _HomePageState extends State<HomePage> {
       _status    = 'Not connected';
       _pitch     = 0.0;
       _roll      = 0.0;
+      _nickname  = 'InclinoCore';
     });
   }
 
@@ -204,28 +261,134 @@ class _HomePageState extends State<HomePage> {
       if (mounted) setState(() {
         _pitch = (json['p'] as num).toDouble();
         _roll  = (json['r'] as num).toDouble();
+        if (json['n'] != null) _nickname = json['n'] as String;
       });
     } catch (_) {}
   }
 
-  Future<void> _sendCalibrate() async {
-    if (_rxChar == null) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('Not connected or RX not found'),
-        backgroundColor: kRed, duration: Duration(seconds: 2)));
-      return;
-    }
+  Future<void> _sendCommand(String cmd) async {
+    if (_rxChar == null) return;
     try {
-      // NimBLE RX char — try write without response first (more compatible)
-      await _rxChar!.write(utf8.encode('CAL\n'), withoutResponse: true);
+      await _rxChar!.write(utf8.encode('$cmd\n'), withoutResponse: true);
+    } catch (e) {
+      debugPrint('BLE write error: $e');
+    }
+  }
+
+  Future<void> _confirmCalibrate() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCard,
+        title: const Text('Calibrate?',
+          style: TextStyle(color: kText)),
+        content: const Text(
+          'Place the vehicle on flat level ground and keep it still.\n\nAre you sure you want to calibrate?',
+          style: TextStyle(color: kDim, fontSize: 14)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text('Cancel', style: TextStyle(color: kDim)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text('Calibrate', style: TextStyle(color: kGreen)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed == true) {
+      await _sendCommand('CAL');
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Calibrating — keep device still for 2 seconds'),
-        backgroundColor: kGreenDim, duration: Duration(seconds: 3)));
-    } catch (e) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Cal error: $e'),
-        backgroundColor: kRed, duration: Duration(seconds: 3)));
+        backgroundColor: kGreenDim,
+        duration: Duration(seconds: 3),
+      ));
     }
+  }
+
+  Future<void> _setNickname() async {
+    final controller = TextEditingController(text: _nickname);
+    final result = await showDialog<String>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCard,
+        title: const Text('Device Nickname',
+          style: TextStyle(color: kText)),
+        content: TextField(
+          controller: controller,
+          maxLength: 20,
+          style: const TextStyle(color: kText),
+          decoration: InputDecoration(
+            hintText: 'e.g. Red Defender',
+            hintStyle: TextStyle(color: kDim),
+            enabledBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: kBorder)),
+            focusedBorder: UnderlineInputBorder(
+              borderSide: BorderSide(color: kGreen)),
+            counterStyle: TextStyle(color: kDim),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: kDim)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, controller.text.trim()),
+            child: Text('Save', style: TextStyle(color: kGreen)),
+          ),
+        ],
+      ),
+    );
+    if (result != null && result.isNotEmpty) {
+      await _sendCommand('NICK:$result');
+      setState(() => _nickname = result);
+    }
+  }
+
+  void _showMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: kCard,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (ctx) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40, height: 4,
+              margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(
+                color: kBorder, borderRadius: BorderRadius.circular(2)),
+            ),
+            _menuItem(Icons.bluetooth_searching, 'Scan for InclinoCore', () {
+              Navigator.pop(ctx);
+              _manualScan();
+            }),
+            _menuItem(Icons.label_outline, 'Set device nickname',
+              _connected ? () { Navigator.pop(ctx); _setNickname(); } : null),
+            const Divider(color: Color(0xFF1E3A1E), indent: 16, endIndent: 16),
+            _menuItem(Icons.tune, 'Calibrate',
+              _connected ? () { Navigator.pop(ctx); _confirmCalibrate(); } : null,
+              color: _connected ? kAmber : kDim),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _menuItem(IconData icon, String label, VoidCallback? onTap,
+      {Color? color}) {
+    final c = color ?? (_connected || label == 'Scan for InclinoCore' ? kText : kDim);
+    return ListTile(
+      leading: Icon(icon, color: c, size: 20),
+      title: Text(label, style: TextStyle(color: c, fontSize: 14)),
+      onTap: onTap,
+    );
   }
 
   @override
@@ -236,19 +399,15 @@ class _HomePageState extends State<HomePage> {
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 16),
-              _buildConnectionCard(),
-              const SizedBox(height: 16),
-              Expanded(child: _buildLevelCard(level)),
-              const SizedBox(height: 16),
-              _buildReadingsCard(level),
-              const SizedBox(height: 16),
-              _buildCalibrationButton(),
-            ],
-          ),
+          child: Column(children: [
+            _buildHeader(),
+            const SizedBox(height: 16),
+            _buildConnectionCard(),
+            const SizedBox(height: 16),
+            Expanded(child: _buildLevelCard(level)),
+            const SizedBox(height: 16),
+            _buildReadingsCard(level),
+          ]),
         ),
       ),
     );
@@ -258,18 +417,16 @@ class _HomePageState extends State<HomePage> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('INCLINOCAR',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w200,
-                letterSpacing: 6, color: kGreen)),
-            Text('ROOFTOP TENT LEVELING',
-              style: TextStyle(fontSize: 9, letterSpacing: 2, color: kDim)),
-            Text('v$kAppVersion',
-              style: TextStyle(fontSize: 9, letterSpacing: 1, color: kDim.withOpacity(0.6))),
-          ],
-        ),
+        Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('INCLINOCAR',
+            style: TextStyle(fontSize: 22, fontWeight: FontWeight.w200,
+              letterSpacing: 6, color: kGreen)),
+          Text('ROOFTOP TENT LEVELING',
+            style: TextStyle(fontSize: 9, letterSpacing: 2, color: kDim)),
+          Text('v$kAppVersion',
+            style: TextStyle(fontSize: 9, letterSpacing: 1,
+              color: kDim.withOpacity(0.6))),
+        ]),
         Row(children: [
           // Wake lock toggle
           GestureDetector(
@@ -283,31 +440,25 @@ class _HomePageState extends State<HomePage> {
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
-                _wakeLock ? Icons.screen_lock_portrait : Icons.screen_lock_portrait_outlined,
+                _wakeLock ? Icons.screen_lock_portrait
+                          : Icons.screen_lock_portrait_outlined,
                 size: 16,
                 color: _wakeLock ? kGreen : kDim,
               ),
             ),
           ),
-          // Connection status
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-            decoration: BoxDecoration(
-              color: _connected ? kGreenDim.withOpacity(0.3) : kCard,
-              border: Border.all(color: _connected ? kGreen : kBorder),
-              borderRadius: BorderRadius.circular(20),
+          // Three-dot menu
+          GestureDetector(
+            onTap: _showMenu,
+            child: Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: kCard,
+                border: Border.all(color: kBorder),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(Icons.more_vert, size: 16, color: kDim),
             ),
-            child: Row(children: [
-              Container(width: 8, height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: _connected ? kGreen : kDim,
-                )),
-              const SizedBox(width: 6),
-              Text(_connected ? 'Connected' : _status,
-                style: TextStyle(fontSize: 11,
-                  color: _connected ? kGreen : kDim)),
-            ]),
           ),
         ]),
       ],
@@ -320,10 +471,17 @@ class _HomePageState extends State<HomePage> {
       decoration: _cardDecor(),
       child: Row(children: [
         Expanded(
-          child: Text(
-            _connected ? _device?.platformName ?? 'InclinoCar'
-                       : 'Tap to connect to InclinoCar',
-            style: TextStyle(color: kText, fontSize: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _connected ? _nickname : 'Tap Connect to find InclinoCore',
+                style: TextStyle(color: kText, fontSize: 14),
+              ),
+              if (_connected)
+                Text(_device?.remoteId.toString() ?? '',
+                  style: TextStyle(color: kDim, fontSize: 10)),
+            ],
           ),
         ),
         const SizedBox(width: 12),
@@ -338,7 +496,7 @@ class _HomePageState extends State<HomePage> {
                   borderRadius: BorderRadius.circular(6)),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              onPressed: _connected ? _disconnect : _startScan,
+              onPressed: _connected ? _disconnect : _autoConnect,
               child: Text(_connected ? 'Disconnect' : 'Connect',
                 style: const TextStyle(fontSize: 13)),
             ),
@@ -405,31 +563,6 @@ class _HomePageState extends State<HomePage> {
     ]);
   }
 
-  Widget _buildCalibrationButton() {
-    return SizedBox(
-      width: double.infinity,
-      child: OutlinedButton(
-        style: OutlinedButton.styleFrom(
-          foregroundColor: _connected ? kText : kDim,
-          side: BorderSide(color: _connected ? kBorder : kBorder.withOpacity(0.5)),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          padding: const EdgeInsets.symmetric(vertical: 14),
-        ),
-        onPressed: _connected ? _sendCalibrate : null,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.tune, size: 16, color: _connected ? kGreen : kDim),
-            const SizedBox(width: 8),
-            Text('Calibrate',
-              style: TextStyle(fontSize: 14, letterSpacing: 1,
-                color: _connected ? kText : kDim)),
-          ],
-        ),
-      ),
-    );
-  }
-
   BoxDecoration _cardDecor() => BoxDecoration(
     color: kCard,
     border: Border.all(color: kBorder),
@@ -437,18 +570,11 @@ class _HomePageState extends State<HomePage> {
   );
 }
 
-// ─── Bubble Level Widget ─────────────────────────────────────
+// ─── Bubble Level ─────────────────────────────────────────────
 class BubbleLevel extends StatelessWidget {
-  final double pitch;
-  final double roll;
+  final double pitch, roll;
   final bool   level;
-
-  const BubbleLevel({
-    super.key,
-    required this.pitch,
-    required this.roll,
-    required this.level,
-  });
+  const BubbleLevel({super.key, required this.pitch, required this.roll, required this.level});
 
   @override
   Widget build(BuildContext context) {
@@ -458,17 +584,11 @@ class BubbleLevel extends StatelessWidget {
       final maxOff = radius * 0.65;
       final dx = (roll  / 15.0).clamp(-1.0, 1.0) * maxOff;
       final dy = (pitch / 15.0).clamp(-1.0, 1.0) * maxOff;
-      final bubbleColor = level ? kGreen : kAmber;
-
-      return SizedBox(
-        width: size, height: size,
+      return SizedBox(width: size, height: size,
         child: CustomPaint(
           painter: _BubblePainter(
             dx: dx, dy: dy, radius: radius,
-            bubbleColor: bubbleColor, level: level,
-          ),
-        ),
-      );
+            bubbleColor: level ? kGreen : kAmber, level: level)));
     });
   }
 }
@@ -477,15 +597,12 @@ class _BubblePainter extends CustomPainter {
   final double dx, dy, radius;
   final Color  bubbleColor;
   final bool   level;
-
-  _BubblePainter({
-    required this.dx, required this.dy, required this.radius,
-    required this.bubbleColor, required this.level,
-  });
+  _BubblePainter({required this.dx, required this.dy, required this.radius,
+    required this.bubbleColor, required this.level});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width  / 2;
+    final cx = size.width / 2;
     final cy = size.height / 2;
 
     canvas.drawCircle(Offset(cx, cy), radius - 2,
@@ -495,32 +612,28 @@ class _BubblePainter extends CustomPainter {
     canvas.drawCircle(Offset(cx, cy), radius * 0.28,
       Paint()..style = PaintingStyle.stroke..color = kBorder..strokeWidth = 1);
 
-    final hairPaint = Paint()..color = kBorder..strokeWidth = 1;
-    canvas.drawLine(Offset(cx - radius + 8, cy), Offset(cx + radius - 8, cy), hairPaint);
-    canvas.drawLine(Offset(cx, cy - radius + 8), Offset(cx, cy + radius - 8), hairPaint);
+    final hair = Paint()..color = kBorder..strokeWidth = 1;
+    canvas.drawLine(Offset(cx - radius + 8, cy), Offset(cx + radius - 8, cy), hair);
+    canvas.drawLine(Offset(cx, cy - radius + 8), Offset(cx, cy + radius - 8), hair);
 
-    final tickPaint = Paint()..color = kDim..strokeWidth = 1.5;
+    final tick = Paint()..color = kDim..strokeWidth = 1.5;
     for (int i = 0; i < 4; i++) {
-      final angle = i * pi / 2;
+      final a = i * pi / 2;
       canvas.drawLine(
-        Offset(cx + (radius - 10) * cos(angle), cy + (radius - 10) * sin(angle)),
-        Offset(cx + (radius - 2)  * cos(angle), cy + (radius - 2)  * sin(angle)),
-        tickPaint,
-      );
+        Offset(cx + (radius-10)*cos(a), cy + (radius-10)*sin(a)),
+        Offset(cx + (radius-2) *cos(a), cy + (radius-2) *sin(a)), tick);
     }
 
-    canvas.drawCircle(Offset(cx + dx + 1, cy + dy + 1), radius * 0.18,
+    canvas.drawCircle(Offset(cx+dx+1, cy+dy+1), radius*0.18,
       Paint()..color = Colors.black.withOpacity(0.3));
-    canvas.drawCircle(Offset(cx + dx, cy + dy), radius * 0.18,
+    canvas.drawCircle(Offset(cx+dx, cy+dy), radius*0.18,
       Paint()..shader = RadialGradient(
         colors: [bubbleColor.withOpacity(0.9), bubbleColor.withOpacity(0.5)],
-      ).createShader(Rect.fromCircle(
-        center: Offset(cx + dx, cy + dy), radius: radius * 0.18)));
-    canvas.drawCircle(Offset(cx + dx, cy + dy), radius * 0.18,
+      ).createShader(Rect.fromCircle(center: Offset(cx+dx, cy+dy), radius: radius*0.18)));
+    canvas.drawCircle(Offset(cx+dx, cy+dy), radius*0.18,
       Paint()..style = PaintingStyle.stroke..color = bubbleColor..strokeWidth = 1.5);
     canvas.drawCircle(
-      Offset(cx + dx - radius * 0.05, cy + dy - radius * 0.05),
-      radius * 0.06,
+      Offset(cx+dx - radius*0.05, cy+dy - radius*0.05), radius*0.06,
       Paint()..color = Colors.white.withOpacity(0.3));
   }
 
