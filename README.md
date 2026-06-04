@@ -16,11 +16,11 @@ Requires Chrome or Edge on desktop.
 
 ### What You Need
 
-- ESP32-C3 DevKitM-1
-- SSD1306 OLED display 128×64 (I2C)
-- MPU-6050 GY-521 accelerometer/gyroscope
-- Momentary push button
-- Jumper wires
+- [ESP32-C3 Super Mini](https://www.amazon.com/DWEII-ESP32-C3-Development-Supermini-Bluetooth/dp/B0G5XS345R)
+- [SSD1306 OLED display 128×64 (I2C)](https://www.amazon.com/UCTRONICS-SSD1306-Self-Luminous-Display-Raspberry/dp/B072Q2X2LL)
+- [MPU-6050 GY-521 accelerometer/gyroscope](https://www.amazon.com/EPLZON-MPU-6050-Accelerometer-Gyroscope-Converter/dp/B09TVYVC6X)
+- [Momentary push button](https://www.amazon.com/Gebildet-Momentary-Button-Switch-Railway/dp/B07YDHP3HS)
+- [Jumper wires (26 AWG Silicone)](https://www.amazon.com/Fermerry-Stranded-Colors-Flexible-electrical/dp/B089D3T1JD)
 
 ### Wiring
 
@@ -65,7 +65,7 @@ GND       →       Terminal 2
 ### Display
 
 ```
-  InclinoCar vX.X.X
+  InclinoCore
   ──────────────────
   P  +2.3°
   R  -1.1°
@@ -73,18 +73,22 @@ GND       →       Terminal 2
   Adjust...            ← or ** LEVEL ** when within 1°
 ```
 
-`BT+` in the top right corner indicates a Bluetooth app connection.
+`BT` in the top right corner indicates a Bluetooth app connection.
 
 ### Calibration
 
 Hold the button for 1 second with the vehicle on flat ground. The device averages 50 readings and saves the offsets to flash memory — they survive reboots.
 
+### Display brigthness
+
+Short press the buttom to cycle through 25%, 50%, 75% and 100% (default start value is 50%).
+
 ### Bluetooth App
 
-The device advertises as **InclinoCar** using the Nordic UART Service (NUS). It sends JSON data every 100ms:
+The device advertises as **InclinoCore** using the Nordic UART Service (NUS). It sends JSON data every 100ms:
 
 ```json
-{"p":2.3,"r":-1.1}
+{"p":1.2,"r":0.3,"n":"InclinoCore"}
 ```
 
 Where `p` = pitch and `r` = roll in degrees.
