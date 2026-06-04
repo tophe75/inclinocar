@@ -35,8 +35,6 @@ const int     BRIGHTNESS_COUNT     = 4;
 int           brightnessIndex      = 1;  // default 50%
 
 // Brightness levels 0-3 → 64, 128, 192, 255
-const int     NUM_BRIGHTNESS       = 4;
-int           brightnessIndex        = 1;  // default 50% (index 1 = 128)
 
 bool          btnWasPressed    = false;
 unsigned long btnPressTime      = 0;
@@ -138,7 +136,7 @@ void loadOffsets() {
 
 
 void cycleBrightness() {
-  brightnessIndex = (brightnessIndex + 1) % NUM_BRIGHTNESS;
+  brightnessIndex = (brightnessIndex + 1) % BRIGHTNESS_COUNT;
   applyBrightness();
   saveBrightness();
 
