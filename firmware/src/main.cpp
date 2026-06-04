@@ -35,9 +35,8 @@ const int     BRIGHTNESS_COUNT     = 4;
 int           brightnessIndex      = 1;  // default 50%
 
 // Brightness levels 0-3 → 64, 128, 192, 255
-const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int     NUM_BRIGHTNESS       = 4;
-int           brightnessIdx        = 1;  // default 50% (index 1 = 128)
+int           brightnessIndex        = 1;  // default 50% (index 1 = 128)
 
 bool          btnWasPressed    = false;
 unsigned long btnPressTime      = 0;
@@ -104,7 +103,7 @@ void setupBLE() {
 
 void saveBrightness() {
   prefs.begin("inclinocar", false);
-  prefs.putInt("brightness", brightnessIdx);
+  prefs.putInt("brightness", brightnessIndex);
   prefs.end();
 }
 
@@ -115,11 +114,6 @@ void saveOffsets() {
   prefs.end();
 }
 
-void saveBrightness() {
-  prefs.begin("inclinocar", false);
-  prefs.putInt("brightness", brightnessIndex);
-  prefs.end();
-}
 
 void applyBrightness() {
   display.ssd1306_command(SSD1306_SETCONTRAST);
@@ -128,9 +122,9 @@ void applyBrightness() {
 
 void loadBrightness() {
   prefs.begin("inclinocar", true);
-  brightnessIdx = prefs.getInt("brightness", 1);  // default index 1 = 50%
+  brightnessIndex = prefs.getInt("brightness", 1);  // default index 1 = 50%
   prefs.end();
-  Serial.printf("Brightness loaded: index=%d val=%d\n", brightnessIdx, BRIGHTNESS_LEVELS[brightnessIdx]);
+  Serial.printf("Brightness loaded: index=%d val=%d\n", brightnessIndex, BRIGHTNESS_LEVELS[brightnessIndex]);
 }
 
 void loadOffsets() {
@@ -142,13 +136,9 @@ void loadOffsets() {
   Serial.printf("Offsets loaded: pitch=%.2f roll=%.2f brightness=%d\n", pitchOffset, rollOffset, brightnessIndex);
 }
 
-void applyBrightness() {
-  display.ssd1306_command(SSD1306_SETCONTRAST);
-  display.ssd1306_command(BRIGHTNESS_LEVELS[brightnessIdx]);
-}
 
 void cycleBrightness() {
-  brightnessIdx = (brightnessIdx + 1) % NUM_BRIGHTNESS;
+  brightnessIndex = (brightnessIndex + 1) % NUM_BRIGHTNESS;
   applyBrightness();
   saveBrightness();
 
@@ -160,7 +150,7 @@ void cycleBrightness() {
   display.println("  Brightness:");
   display.setTextSize(2);
   display.setCursor(20, 36);
-  int pct = (BRIGHTNESS_LEVELS[brightnessIdx] * 100) / 255;
+  int pct = (BRIGHTNESS_LEVELS[brightnessIndex] * 100) / 255;
   display.printf("  %d%%", pct);
   display.display();
   delay(800);
