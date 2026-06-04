@@ -125,7 +125,7 @@ void calibrate() {
                        a.acceleration.z*a.acceleration.z)) * 180.0/PI;
     float rr = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
     // Apply same CW 90 rotation
-    pSum += -rr;
+    pSum +=  rr;
     rSum +=  rp;
     delay(20);
   }
@@ -213,7 +213,7 @@ void loop() {
   float rawRoll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
 
   // Rotate axes CW 90 degrees then apply calibration offsets
-  float rotPitch = -rawRoll  - pitchOffset;
+  float rotPitch =  rawRoll  - pitchOffset;
   float rotRoll  =  rawPitch - rollOffset;
 
   // Exponential moving average to reduce jitter
