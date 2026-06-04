@@ -29,6 +29,16 @@ float smoothedPitch  = 0.0;
 float smoothedRoll   = 0.0;
 const float ALPHA    = 0.15f;  // lower = smoother, higher = more responsive
 
+// Brightness levels: 25%, 50%, 75%, 100%
+const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
+const int     BRIGHTNESS_COUNT     = 4;
+int           brightnessIndex      = 1;  // default 50%
+
+// Brightness levels 0-3 → 64, 128, 192, 255
+const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
+const int     NUM_BRIGHTNESS       = 4;
+int           brightnessIdx        = 1;  // default 50% (index 1 = 128)
+
 bool          btnWasPressed    = false;
 unsigned long btnPressTime      = 0;
 bool          calibratePending  = false;
@@ -92,6 +102,12 @@ void setupBLE() {
   Serial.println("BLE advertising as 'InclinoCar'");
 }
 
+void saveBrightness() {
+  prefs.begin("inclinocar", false);
+  prefs.putInt("brightness", brightnessIdx);
+  prefs.end();
+}
+
 void saveOffsets() {
   prefs.begin("inclinocar", false);
   prefs.putFloat("pitchOff", pitchOffset);
@@ -99,12 +115,55 @@ void saveOffsets() {
   prefs.end();
 }
 
+void saveBrightness() {
+  prefs.begin("inclinocar", false);
+  prefs.putInt("brightness", brightnessIndex);
+  prefs.end();
+}
+
+void applyBrightness() {
+  display.ssd1306_command(SSD1306_SETCONTRAST);
+  display.ssd1306_command(BRIGHTNESS_LEVELS[brightnessIndex]);
+}
+
+void loadBrightness() {
+  prefs.begin("inclinocar", true);
+  brightnessIdx = prefs.getInt("brightness", 1);  // default index 1 = 50%
+  prefs.end();
+  Serial.printf("Brightness loaded: index=%d val=%d\n", brightnessIdx, BRIGHTNESS_LEVELS[brightnessIdx]);
+}
+
 void loadOffsets() {
   prefs.begin("inclinocar", true);
-  pitchOffset = prefs.getFloat("pitchOff", 0.0);
-  rollOffset  = prefs.getFloat("rollOff",  0.0);
+  pitchOffset     = prefs.getFloat("pitchOff", 0.0);
+  rollOffset      = prefs.getFloat("rollOff",  0.0);
+  brightnessIndex = prefs.getInt("brightness", 1);  // default 50%
   prefs.end();
-  Serial.printf("Offsets loaded: pitch=%.2f roll=%.2f\n", pitchOffset, rollOffset);
+  Serial.printf("Offsets loaded: pitch=%.2f roll=%.2f brightness=%d\n", pitchOffset, rollOffset, brightnessIndex);
+}
+
+void applyBrightness() {
+  display.ssd1306_command(SSD1306_SETCONTRAST);
+  display.ssd1306_command(BRIGHTNESS_LEVELS[brightnessIdx]);
+}
+
+void cycleBrightness() {
+  brightnessIdx = (brightnessIdx + 1) % NUM_BRIGHTNESS;
+  applyBrightness();
+  saveBrightness();
+
+  // Brief feedback on screen
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 20);
+  display.println("  Brightness:");
+  display.setTextSize(2);
+  display.setCursor(20, 36);
+  int pct = (BRIGHTNESS_LEVELS[brightnessIdx] * 100) / 255;
+  display.printf("  %d%%", pct);
+  display.display();
+  delay(800);
 }
 
 void calibrate() {
@@ -141,15 +200,36 @@ void calibrate() {
   delay(1500);
 }
 
+void showBrightnessMsg() {
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 20); display.println("  Brightness:");
+  display.setTextSize(2);
+  int pct = (brightnessIndex + 1) * 25;
+  display.setCursor(32, 36); display.printf("%d%%", pct);
+  display.display();
+  delay(600);
+}
+
 void handleButton() {
   bool pressed = (digitalRead(BTN_PIN) == LOW);
+
   if (pressed && !btnWasPressed) {
     btnPressTime  = millis();
     btnWasPressed = true;
   }
+
+  // Released before hold threshold — single press → brightness
   if (!pressed && btnWasPressed) {
     btnWasPressed = false;
+    unsigned long held = millis() - btnPressTime;
+    if (held < CAL_HOLD_MS) {
+      cycleBrightness();
+    }
   }
+
+  // Still held past threshold → calibrate
   if (pressed && btnWasPressed && millis() - btnPressTime >= CAL_HOLD_MS) {
     btnWasPressed = false;
     calibrate();
@@ -183,6 +263,8 @@ void setup() {
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   loadOffsets();
+  loadBrightness();
+  applyBrightness();
   setupBLE();
 
   display.clearDisplay();
