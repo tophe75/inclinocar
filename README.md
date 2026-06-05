@@ -6,6 +6,8 @@ Rooftop tent leveling assistant using ESP32-C3 and MPU-6050. Displays real-time 
 
 Flash firmware directly in your browser — no drivers or software needed.
 
+Make sure you flash the device before you build the unit and mount it in the case, the 'original' case has no hole/button to press the boot button once assembled
+
 👉 **[tophe75.github.io/inclinocar](https://tophe75.github.io/inclinocar/)**
 
 Requires Chrome or Edge on desktop.
