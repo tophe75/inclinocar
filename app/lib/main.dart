@@ -159,7 +159,6 @@ class _HomePageState extends State<HomePage> {
     await [
       Permission.bluetoothScan,
       Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
     ].request();
   }
 
