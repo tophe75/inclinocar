@@ -50,7 +50,9 @@ jobs:
         run: cd app && flutter pub get
 
       - name: Build APK
-        run: cd app && flutter build apk --release
+        run: |
+          cd app && flutter build apk --release
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/InclinoCar-installer.apk
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -64,4 +66,4 @@ jobs:
             1. Download `app-release.apk` below
             2. On your Android phone: Settings → Security → Install unknown apps → allow your browser
             3. Open the downloaded APK and tap Install
-          files: app/build/app/outputs/flutter-apk/app-release.apk
+          files: app/build/app/outputs/flutter-apk/InclinoCar-installer.apk
