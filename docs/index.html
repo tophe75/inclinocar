@@ -50,7 +50,7 @@
     }
     .selector-group {
       text-align: left;
-      margin-bottom: 20px;
+      margin-bottom: 16px;
     }
     .selector-group label {
       display: block;
@@ -77,13 +77,13 @@
       background: #0a120a;
       border: 1px solid var(--border);
       border-radius: 8px;
-      padding: 14px;
+      padding: 12px 14px;
       margin-bottom: 20px;
       font-size: 0.82rem;
       color: var(--dim);
-      line-height: 1.7;
+      line-height: 1.6;
       text-align: left;
-      min-height: 48px;
+      min-height: 40px;
     }
     .info strong { color: var(--text); }
     esp-web-install-button { display: block; margin-bottom: 16px; }
@@ -106,6 +106,16 @@
       color: var(--dim);
     }
     .footer a { color: var(--dim); }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      padding: 2px 7px;
+      border-radius: 10px;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    .badge-latest { background: #1a4a1a; color: var(--green); border: 1px solid var(--green); }
+    .badge-old    { background: #0a120a; color: var(--dim);   border: 1px solid var(--border); }
   </style>
 </head>
 <body>
@@ -115,14 +125,12 @@
 
   <div class="selector-group">
     <label>Version</label>
-    <select id="version-select" onchange="updateVersion()">
-      <option value="">Loading...</option>
+    <select id="version-select" onchange="onVersionChange()">
+      <option value="">Loading versions...</option>
     </select>
   </div>
 
-  <div class="info" id="fw-info">
-    Reads pitch &amp; roll from MPU-6050, displays on OLED. Connect via Bluetooth to the InclinoCar Android app for a full visual display.
-  </div>
+  <div class="info" id="fw-info">Select a version to install.</div>
 
   <esp-web-install-button id="install-btn" manifest="manifest.json">
     <span slot="unsupported">
@@ -137,30 +145,92 @@
 </div>
 
 <script>
-const REPO = 'tophe75/inclinocar';
+const REPO  = 'tophe75/inclinocar';
+const PAGES = 'https://tophe75.github.io/inclinocar';
 
+// Fetch all fw-v* and v* releases from GitHub API
 async function loadVersions() {
   try {
-    const res  = await fetch(`https://api.github.com/repos/${REPO}/releases`);
+    const res  = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=50`);
     const data = await res.json();
-    const sel  = document.getElementById('version-select');
+
+    // Filter to firmware releases only
+    const fwReleases = data.filter(r =>
+      r.tag_name.startsWith('fw-v') || r.tag_name.startsWith('v')
+    );
+
+    const sel = document.getElementById('version-select');
     sel.innerHTML = '';
-    data.forEach((r, i) => {
-      const opt = document.createElement('option');
-      opt.value = r.tag_name;
-      opt.text  = r.tag_name + (i === 0 ? ' (latest)' : '');
+
+    fwReleases.forEach((r, i) => {
+      const opt  = document.createElement('option');
+      opt.value  = JSON.stringify({
+        tag:    r.tag_name,
+        latest: i === 0,
+        assets: r.assets.map(a => ({ name: a.name, url: a.browser_download_url }))
+      });
+      opt.text = r.tag_name + (i === 0 ? ' (latest)' : '');
       sel.appendChild(opt);
     });
-    updateVersion();
+
+    onVersionChange();
   } catch (e) {
-    document.getElementById('version-select').innerHTML = '<option value="">Could not load versions</option>';
+    document.getElementById('version-select').innerHTML =
+      '<option value="">Could not load versions</option>';
+    document.getElementById('fw-info').innerHTML =
+      'Failed to load releases. Check your connection.';
   }
 }
 
-function updateVersion() {
-  const version = document.getElementById('version-select').value;
-  if (!version) return;
-  document.getElementById('install-btn').setAttribute('manifest', 'manifest.json');
+function onVersionChange() {
+  const sel = document.getElementById('version-select');
+  if (!sel.value) return;
+
+  const { tag, latest, assets } = JSON.parse(sel.value);
+  const btn = document.getElementById('install-btn');
+  const info = document.getElementById('fw-info');
+
+  if (latest) {
+    // Latest version — use GitHub Pages (fast CDN)
+    btn.setAttribute('manifest', `${PAGES}/manifest.json`);
+    info.innerHTML = `<strong>${tag}</strong> &nbsp;<span class="badge badge-latest">latest</span><br>
+      Served from GitHub Pages CDN for fastest install.`;
+  } else {
+    // Older version — build manifest on the fly pointing to GitHub Release assets
+    const manifest = buildManifest(tag, assets);
+    if (!manifest) {
+      info.innerHTML = `<strong>${tag}</strong> — release assets not found. Try a different version.`;
+      return;
+    }
+    // Write manifest to a blob URL so esp-web-tools can fetch it
+    const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
+    const url  = URL.createObjectURL(blob);
+    btn.setAttribute('manifest', url);
+    info.innerHTML = `<strong>${tag}</strong> &nbsp;<span class="badge badge-old">older</span><br>
+      Served from GitHub Release assets.`;
+  }
+}
+
+function buildManifest(tag, assets) {
+  const find = name => assets.find(a => a.name === name)?.url;
+  const bl = find('bootloader.bin');
+  const pt = find('partitions.bin');
+  const fw = find('firmware.bin');
+  if (!bl || !pt || !fw) return null;
+
+  return {
+    name: 'InclinoCar',
+    version: tag.replace(/^fw-v/, '').replace(/^v/, ''),
+    new_install_prompt_erase: true,
+    builds: [{
+      chipFamily: 'ESP32-C3',
+      parts: [
+        { path: bl, offset: 0 },
+        { path: pt, offset: 32768 },
+        { path: fw, offset: 65536 }
+      ]
+    }]
+  };
 }
 
 loadVersions();
