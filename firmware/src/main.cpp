@@ -95,14 +95,14 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
         Serial.println("BLE: PIN verified");
         // Send confirmation
         if (pTxChar) {
-          String ack = "{"pin":"ok","n":"" + String(deviceNickname) + ""}\n";
+          String ack = String("{\"pin\":\"ok\",\"n\":\"") + deviceNickname + "\"}\n";
           pTxChar->setValue((uint8_t*)ack.c_str(), ack.length());
           pTxChar->notify();
         }
       } else {
         Serial.println("BLE: PIN rejected");
         if (pTxChar) {
-          String nak = "{"pin":"fail"}\n";
+          String nak = "{\"pin\":\"fail\"}\n";
           pTxChar->setValue((uint8_t*)nak.c_str(), nak.length());
           pTxChar->notify();
         }
