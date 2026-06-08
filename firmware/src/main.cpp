@@ -6,6 +6,7 @@
 #include <Adafruit_SSD1306.h>
 #include <math.h>
 #include <NimBLEDevice.h>
+#include <esp_mac.h>
 
 // I2C: SDA=GPIO6, SCL=GPIO7
 // Button: GPIO5 → GND (hold 1s = calibrate)
@@ -21,6 +22,14 @@
 
 // Device nickname (user settable)
 char deviceNickname[32] = "InclinoCore";
+uint16_t devicePIN = 0;
+
+uint16_t generatePIN() {
+  // Deterministic PIN from MAC — same device always same PIN
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  return (mac[4] * 256 + mac[5]) % 9000 + 1000;
+}
 
 Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_MPU6050 mpu;
@@ -42,6 +51,7 @@ int           brightnessIndex      = 1;  // default 50%
 bool          btnWasPressed    = false;
 unsigned long btnPressTime      = 0;
 bool          calibratePending  = false;
+bool          pinVerified       = false;
 
 // BLE
 NimBLEServer*         pServer  = nullptr;
@@ -55,6 +65,7 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   }
   void onDisconnect(NimBLEServer* s) override {
     bleConnected = false;
+    pinVerified  = false;
     Serial.println("BLE disconnected");
     NimBLEDevice::startAdvertising();
   }
@@ -68,8 +79,36 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
     String cmd = String(val.c_str());
     cmd.trim();
     Serial.printf("BLE RX: %s\n", cmd.c_str());
-    if (cmd == "CAL") {
-      calibratePending = true;
+    if (cmd.startsWith("KNOWNMAC:")) {
+      // Known device reconnecting — skip PIN
+      pinVerified = true;
+      Serial.println("BLE: known device reconnected");
+      if (pTxChar) {
+        String ack = "{\"pin\":\"ok\",\"n\":\"" + String(deviceNickname) + "\"}\n";
+        pTxChar->setValue((uint8_t*)ack.c_str(), ack.length());
+        pTxChar->notify();
+      }
+    } else if (cmd.startsWith("PIN:")) {
+      uint16_t entered = cmd.substring(4).toInt();
+      if (entered == devicePIN) {
+        pinVerified = true;
+        Serial.println("BLE: PIN verified");
+        // Send confirmation
+        if (pTxChar) {
+          String ack = "{"pin":"ok","n":"" + String(deviceNickname) + ""}\n";
+          pTxChar->setValue((uint8_t*)ack.c_str(), ack.length());
+          pTxChar->notify();
+        }
+      } else {
+        Serial.println("BLE: PIN rejected");
+        if (pTxChar) {
+          String nak = "{"pin":"fail"}\n";
+          pTxChar->setValue((uint8_t*)nak.c_str(), nak.length());
+          pTxChar->notify();
+        }
+      }
+    } else if (cmd == "CAL") {
+      if (pinVerified) calibratePending = true;
       Serial.println("BLE: calibration requested");
     } else if (cmd.startsWith("NICK:")) {
       String nick = cmd.substring(5);
@@ -122,8 +161,9 @@ void saveNickname() {
   prefs.begin("inclinocar", false);
   prefs.putString("nickname", deviceNickname);
   prefs.end();
-  // Update BLE advertising name
+  // Update BLE advertising name and restart advertising
   NimBLEDevice::setDeviceName(deviceNickname);
+  NimBLEDevice::startAdvertising();
 }
 
 void loadNickname() {
@@ -282,15 +322,24 @@ void setup() {
   loadOffsets();
   loadNickname();
   loadBrightness();
+  devicePIN = generatePIN();
+  Serial.printf("Device PIN: %04d\n", devicePIN);
   applyBrightness();
   setupBLE();
 
   display.clearDisplay();
-  display.setCursor(0, 0);  display.println("  InclinoCar");
+  // Show MAC and PIN on boot screen
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+    mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+  display.setCursor(0, 0);  display.println(deviceNickname);
   display.setCursor(0, 12); display.println("  " FW_VERSION);
-  display.setCursor(0, 28); display.println(
+  display.setCursor(0, 26); display.printf("  %s", macStr);
+  display.setCursor(0, 40); display.printf("  PIN: %04d", devicePIN);
+  display.setCursor(0, 54); display.println(
     (pitchOffset != 0.0 || rollOffset != 0.0) ? "  Cal loaded" : "  Hold btn: cal");
-  display.setCursor(0, 44); display.println("  BLE ready");
   display.display();
   delay(1500);
 }
@@ -323,8 +372,8 @@ void loop() {
   float pitch = smoothedPitch;
   float roll  = smoothedRoll;
 
-  // Send JSON over BLE NUS
-  if (bleConnected) {
+  // Send JSON over BLE NUS — only after PIN verified
+  if (bleConnected && pinVerified) {
     char buf[96];
     snprintf(buf, sizeof(buf), "{\"p\":%.1f,\"r\":%.1f,\"n\":\"%s\"}\n", pitch, roll, deviceNickname);
     pTxChar->setValue((uint8_t*)buf, strlen(buf));
@@ -358,10 +407,13 @@ void loop() {
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
   display.print(level ? "  ** LEVEL **" : "  Adjust...");
 
-  // BT indicator — only show when connected, pinned to right edge
-  if (bleConnected) {
+  // Show PIN when not connected so user can always find it
+  if (bleConnected && pinVerified) {
     display.setCursor(116, 0);
     display.print("BT");
+  } else if (!bleConnected) {
+    display.setCursor(68, 0);
+    display.printf("PIN:%04d", devicePIN);
   }
 
   display.display();

@@ -23,9 +23,8 @@ const Color kBorder   = Color(0xFF1E3A1E);
 const Color kAmber    = Color(0xFFFFB300);
 const Color kRed      = Color(0xFFEF5350);
 
-const String kAppVersion = '0.0.16';
+const String kAppVersion = '0.0.30';
 
-// ─── Known device model ──────────────────────────────────────
 class KnownDevice {
   final String mac;
   final String nickname;
@@ -75,19 +74,19 @@ class _HomePageState extends State<HomePage> {
   StreamSubscription?      _dataSub;
   StreamSubscription?      _connSub;
 
-  bool   _scanning  = false;
-  bool   _connected = false;
-  bool   _wakeLock  = true;
-  String _status    = 'Not connected';
-  String _nickname  = '';
+  bool   _scanning    = false;
+  bool   _connected   = false;
+  bool   _pinVerified = false;
+  bool   _wakeLock    = true;
+  String _status      = 'Not connected';
+  String _nickname    = '';
   String _connectedMac = '';
 
   double _pitch = 0.0;
   double _roll  = 0.0;
 
-  // Persisted known devices
-  List<KnownDevice> _knownDevices = [];
-  String?           _preferredMac; // last used device
+  List<KnownDevice> _knownDevices  = [];
+  String?           _preferredMac;
 
   @override
   void initState() {
@@ -115,7 +114,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {
       _preferredMac = mac;
       _knownDevices = list.map((s) => KnownDevice.fromJson(s)).toList();
-      // Pre-fill nickname from stored devices
       if (mac != null) {
         final known = _knownDevices.where((d) => d.mac == mac).firstOrNull;
         if (known != null) _nickname = known.nickname;
@@ -125,7 +123,6 @@ class _HomePageState extends State<HomePage> {
 
   Future<void> _saveDevice(String mac, String nickname) async {
     final prefs = await SharedPreferences.getInstance();
-    // Update or add
     _knownDevices.removeWhere((d) => d.mac == mac);
     _knownDevices.insert(0, KnownDevice(mac: mac, nickname: nickname));
     await prefs.setString('preferred_mac', mac);
@@ -150,7 +147,6 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
-  // ── Permissions ──────────────────────────────────────────────
   Future<void> _requestPermissions() async {
     await [
       Permission.bluetoothScan,
@@ -159,23 +155,19 @@ class _HomePageState extends State<HomePage> {
     ].request();
   }
 
-  // ── Auto-connect to preferred/known device ───────────────────
+  // ── Auto-connect to known MAC (no PIN needed for known devices) ──
   Future<void> _autoConnect() async {
     await _requestPermissions();
     setState(() { _scanning = true; _status = 'Scanning...'; });
 
-    await FlutterBluePlus.startScan(
-      timeout: const Duration(seconds: 10),
-    );
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 10));
 
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
         final mac = r.device.remoteId.toString();
-        final isPreferred = mac == _preferredMac;
-        final isKnown     = _knownDevices.any((d) => d.mac == mac);
-        if (isPreferred || (_preferredMac == null && isKnown)) {
+        if (mac == _preferredMac) {
           FlutterBluePlus.stopScan();
-          _connect(r.device);
+          _connectAndSkipPin(r.device);
           break;
         }
       }
@@ -188,24 +180,23 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  // ── Manual scan — shows all InclinoCore devices ──────────────
+  // ── Manual scan — show all InclinoCore devices ───────────────
   Future<void> _manualScan() async {
     await _requestPermissions();
     final found = <ScanResult>[];
     setState(() => _scanning = true);
 
-    await FlutterBluePlus.startScan(
-      timeout: const Duration(seconds: 8),
-    );
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 8));
 
     await for (final results in FlutterBluePlus.scanResults) {
       for (final r in results) {
-        final mac = r.device.remoteId.toString();
         final name = r.device.platformName;
-        final uuids = r.advertisementData.serviceUuids.map((u) => u.toString()).join(',');
-        debugPrint('SCAN: $name | $mac | uuids: $uuids');
-        // Accept all devices so user can see what's around
-        if (!found.any((e) => e.device.remoteId == r.device.remoteId)) {
+        // Accept InclinoCore by name OR known MACs
+        final mac     = r.device.remoteId.toString();
+        final isCore  = name == 'InclinoCore';
+        final isKnown = _knownDevices.any((d) => d.mac == mac);
+        if ((isCore || isKnown) &&
+            !found.any((e) => e.device.remoteId == r.device.remoteId)) {
           found.add(r);
         }
       }
@@ -216,11 +207,12 @@ class _HomePageState extends State<HomePage> {
 
     if (found.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No InclinoCore devices found'),
+        content: Text('No InclinoCore devices found. Check device is powered on.'),
         backgroundColor: kRed));
       return;
     }
 
+    // Show device picker
     final picked = await showDialog<BluetoothDevice>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -232,11 +224,16 @@ class _HomePageState extends State<HomePage> {
           children: found.map((r) {
             final mac   = r.device.remoteId.toString();
             final known = _knownDevices.where((d) => d.mac == mac).firstOrNull;
+            final isKnown = known != null;
             return ListTile(
-              title: Text(known?.nickname ?? 
-                (r.device.platformName.isNotEmpty ? r.device.platformName : 'Unknown'),
-                style: const TextStyle(color: kText)),
-              subtitle: Text(mac, style: TextStyle(color: kDim, fontSize: 11)),
+              leading: Icon(
+                isKnown ? Icons.star : Icons.bluetooth,
+                color: isKnown ? kGreen : kDim, size: 20),
+              title: Text(
+                known?.nickname ?? r.device.platformName,
+                style: const TextStyle(color: kText, fontSize: 14)),
+              subtitle: Text(mac,
+                style: TextStyle(color: kDim, fontSize: 11)),
               trailing: Text('${r.rssi} dBm',
                 style: TextStyle(color: kDim, fontSize: 11)),
               onTap: () => Navigator.pop(ctx, r.device),
@@ -246,12 +243,99 @@ class _HomePageState extends State<HomePage> {
       ),
     );
 
-    if (picked != null) _connect(picked);
+    if (picked == null) return;
+
+    final mac     = picked.remoteId.toString();
+    final isKnown = _knownDevices.any((d) => d.mac == mac);
+
+    if (isKnown) {
+      // Known device — skip PIN
+      _connectAndSkipPin(picked);
+    } else {
+      // New device — ask for PIN
+      _connectWithPin(picked);
+    }
   }
 
-  // ── Connect ──────────────────────────────────────────────────
-  Future<void> _connect(BluetoothDevice device) async {
-    setState(() => _status = 'Connecting...');
+  // ── Connect known device (no PIN prompt) ─────────────────────
+  Future<void> _connectAndSkipPin(BluetoothDevice device) async {
+    await _connectBLE(device);
+    if (_connected) {
+      // Send a bypass token for known devices
+      await Future.delayed(const Duration(milliseconds: 500));
+      await _sendRaw('KNOWNMAC:${device.remoteId}');
+    }
+  }
+
+  // ── Connect new device with PIN prompt ───────────────────────
+  Future<void> _connectWithPin(BluetoothDevice device) async {
+    // Show PIN dialog first
+    final pin = await _showPinDialog(device.remoteId.toString());
+    if (pin == null) return;
+
+    await _connectBLE(device);
+    if (!_connected) return;
+
+    // Send PIN
+    await Future.delayed(const Duration(milliseconds: 500));
+    await _sendRaw('PIN:$pin');
+  }
+
+  Future<String?> _showPinDialog(String mac) async {
+    final ctrl = TextEditingController();
+    return showDialog<String>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: kCard,
+        title: const Text('Enter PIN', style: TextStyle(color: kText)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Check the InclinoCore display for the 4-digit PIN.',
+              style: TextStyle(color: kDim, fontSize: 13)),
+            const SizedBox(height: 8),
+            Text(mac, style: TextStyle(color: kDim, fontSize: 10)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: ctrl,
+              keyboardType: TextInputType.number,
+              maxLength: 4,
+              autofocus: true,
+              style: const TextStyle(color: kText, fontSize: 24,
+                letterSpacing: 8, fontWeight: FontWeight.w300),
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: '0000',
+                hintStyle: TextStyle(color: kDim, letterSpacing: 8),
+                counterText: '',
+                enabledBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: kBorder),
+                  borderRadius: BorderRadius.circular(8)),
+                focusedBorder: OutlineInputBorder(
+                  borderSide: BorderSide(color: kGreen),
+                  borderRadius: BorderRadius.circular(8)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx),
+            child: Text('Cancel', style: TextStyle(color: kDim))),
+          TextButton(
+            onPressed: () {
+              if (ctrl.text.length == 4) Navigator.pop(ctx, ctrl.text);
+            },
+            child: Text('Connect', style: TextStyle(color: kGreen))),
+        ],
+      ),
+    );
+  }
+
+  // ── Core BLE connect ─────────────────────────────────────────
+  Future<void> _connectBLE(BluetoothDevice device) async {
+    setState(() { _status = 'Connecting...'; });
     _device = device;
     _connectedMac = device.remoteId.toString();
 
@@ -261,10 +345,11 @@ class _HomePageState extends State<HomePage> {
       _connSub = device.connectionState.listen((state) {
         if (state == BluetoothConnectionState.disconnected) {
           setState(() {
-            _connected = false;
-            _status    = 'Disconnected';
-            _pitch     = 0.0;
-            _roll      = 0.0;
+            _connected   = false;
+            _pinVerified = false;
+            _status      = 'Disconnected';
+            _pitch       = 0.0;
+            _roll        = 0.0;
           });
           _dataSub?.cancel();
         }
@@ -285,7 +370,7 @@ class _HomePageState extends State<HomePage> {
         }
       }
 
-      setState(() { _connected = true; _status = 'Connected'; });
+      setState(() { _connected = true; _status = 'Verifying...'; });
     } catch (e) {
       setState(() => _status = 'Connection failed');
     }
@@ -297,10 +382,11 @@ class _HomePageState extends State<HomePage> {
     _dataSub?.cancel();
     _connSub?.cancel();
     setState(() {
-      _connected = false;
-      _status    = 'Not connected';
-      _pitch     = 0.0;
-      _roll      = 0.0;
+      _connected   = false;
+      _pinVerified = false;
+      _status      = 'Not connected';
+      _pitch       = 0.0;
+      _roll        = 0.0;
     });
   }
 
@@ -308,23 +394,45 @@ class _HomePageState extends State<HomePage> {
     final str = utf8.decode(data).trim();
     try {
       final json = jsonDecode(str) as Map<String, dynamic>;
-      if (mounted) setState(() {
-        _pitch = (json['p'] as num).toDouble();
-        _roll  = (json['r'] as num).toDouble();
-        if (json['n'] != null) {
-          _nickname = json['n'] as String;
-          // Save device on first data receive
-          _saveDevice(_connectedMac, _nickname);
+
+      // PIN response
+      if (json['pin'] != null) {
+        if (json['pin'] == 'ok') {
+          setState(() { _pinVerified = true; _status = 'Connected'; });
+          final nick = json['n'] as String? ?? 'InclinoCore';
+          setState(() => _nickname = nick);
+          _saveDevice(_connectedMac, nick);
+        } else {
+          setState(() => _status = 'Wrong PIN');
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+            content: Text('Wrong PIN — check the display and try again'),
+            backgroundColor: kRed));
+          _disconnect();
         }
-      });
+        return;
+      }
+
+      // Data stream
+      if (json['p'] != null && _pinVerified && mounted) {
+        setState(() {
+          _pitch = (json['p'] as num).toDouble();
+          _roll  = (json['r'] as num).toDouble();
+          if (json['n'] != null) _nickname = json['n'] as String;
+        });
+      }
     } catch (_) {}
   }
 
-  Future<void> _sendCommand(String cmd) async {
+  Future<void> _sendRaw(String cmd) async {
     if (_rxChar == null) return;
     try {
       await _rxChar!.write(utf8.encode('$cmd\n'), withoutResponse: true);
     } catch (e) { debugPrint('BLE write: $e'); }
+  }
+
+  Future<void> _sendCommand(String cmd) async {
+    if (_rxChar == null || !_pinVerified) return;
+    await _sendRaw(cmd);
   }
 
   Future<void> _confirmCalibrate() async {
@@ -394,7 +502,7 @@ class _HomePageState extends State<HomePage> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (ctx) => StatefulBuilder(
-        builder: (ctx, setSheetState) => Padding(
+        builder: (ctx, setSS) => Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -405,23 +513,18 @@ class _HomePageState extends State<HomePage> {
                   color: kBorder, borderRadius: BorderRadius.circular(2))),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Row(children: [
-                  Text('Known Devices',
-                    style: TextStyle(color: kText, fontSize: 14,
-                      fontWeight: FontWeight.w500)),
-                ]),
-              ),
+                child: Text('Known Devices',
+                  style: TextStyle(color: kText, fontSize: 14,
+                    fontWeight: FontWeight.w500))),
               if (_knownDevices.isEmpty)
-                Padding(
-                  padding: const EdgeInsets.all(24),
+                Padding(padding: const EdgeInsets.all(24),
                   child: Text('No saved devices',
                     style: TextStyle(color: kDim, fontSize: 13)))
               else
                 ..._knownDevices.map((d) => ListTile(
                   leading: Icon(
                     d.mac == _preferredMac ? Icons.star : Icons.bluetooth,
-                    color: d.mac == _preferredMac ? kGreen : kDim,
-                    size: 20),
+                    color: d.mac == _preferredMac ? kGreen : kDim, size: 20),
                   title: Text(d.nickname,
                     style: const TextStyle(color: kText, fontSize: 14)),
                   subtitle: Text(d.mac,
@@ -430,9 +533,8 @@ class _HomePageState extends State<HomePage> {
                     icon: Icon(Icons.delete_outline, color: kRed, size: 20),
                     onPressed: () async {
                       await _removeDevice(d.mac);
-                      setSheetState(() {});
-                    },
-                  ),
+                      setSS(() {});
+                    }),
                   onTap: () {
                     setState(() => _preferredMac = d.mac);
                     SharedPreferences.getInstance().then(
@@ -464,19 +566,19 @@ class _HomePageState extends State<HomePage> {
               decoration: BoxDecoration(
                 color: kBorder, borderRadius: BorderRadius.circular(2))),
             _menuItem(Icons.bluetooth_searching, 'Scan for InclinoCore', () {
-              Navigator.pop(ctx);
-              _manualScan();
+              Navigator.pop(ctx); _manualScan();
             }),
             _menuItem(Icons.devices, 'Known devices', () {
-              Navigator.pop(ctx);
-              _showKnownDevices();
+              Navigator.pop(ctx); _showKnownDevices();
             }),
             _menuItem(Icons.label_outline, 'Set device nickname',
-              _connected ? () { Navigator.pop(ctx); _setNickname(); } : null),
+              _connected && _pinVerified
+                ? () { Navigator.pop(ctx); _setNickname(); } : null),
             const Divider(color: Color(0xFF1E3A1E), indent: 16, endIndent: 16),
             _menuItem(Icons.tune, 'Calibrate',
-              _connected ? () { Navigator.pop(ctx); _confirmCalibrate(); } : null,
-              color: _connected ? kAmber : kDim),
+              _connected && _pinVerified
+                ? () { Navigator.pop(ctx); _confirmCalibrate(); } : null,
+              color: (_connected && _pinVerified) ? kAmber : kDim),
             const SizedBox(height: 8),
           ],
         ),
@@ -557,8 +659,7 @@ class _HomePageState extends State<HomePage> {
             child: Container(
               padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                color: kCard,
-                border: Border.all(color: kBorder),
+                color: kCard, border: Border.all(color: kBorder),
                 borderRadius: BorderRadius.circular(8)),
               child: Icon(Icons.more_vert, size: 16, color: kDim))),
         ]),
@@ -567,32 +668,33 @@ class _HomePageState extends State<HomePage> {
   }
 
   Widget _buildConnectionCard() {
-    // Show saved nickname if we have a preferred device
     final savedDevice = _preferredMac != null
       ? _knownDevices.where((d) => d.mac == _preferredMac).firstOrNull
       : null;
     final displayName = _connected
-      ? _nickname.isNotEmpty ? _nickname : 'InclinoCore'
-      : savedDevice?.nickname ?? 'No saved device';
-    final displayMac = _connected
-      ? _connectedMac
-      : _preferredMac ?? '';
+      ? (_nickname.isNotEmpty ? _nickname : 'InclinoCore')
+      : savedDevice?.nickname ?? '';
+    final displayMac = _connected ? _connectedMac : _preferredMac ?? '';
 
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: _cardDecor(),
       child: Row(children: [
-        Expanded(
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            Text(displayName, style: TextStyle(color: kText, fontSize: 14)),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _connected
+                ? (_pinVerified ? displayName : 'Verifying PIN...')
+                : (displayName.isNotEmpty ? displayName : 'No saved device'),
+              style: TextStyle(color: kText, fontSize: 14)),
             if (displayMac.isNotEmpty)
-              Text(displayMac,
-                style: TextStyle(color: kDim, fontSize: 10)),
+              Text(displayMac, style: TextStyle(color: kDim, fontSize: 10)),
             if (!_connected && _preferredMac == null)
-              Text('Use menu → Scan to find a device',
+              Text('Menu → Scan to find InclinoCore',
                 style: TextStyle(color: kDim, fontSize: 10)),
-          ]),
-        ),
+          ],
+        )),
         const SizedBox(width: 12),
         _scanning
           ? SizedBox(width: 20, height: 20,
@@ -718,19 +820,19 @@ class _BubblePainter extends CustomPainter {
   void _drawCar(Canvas canvas, double cx, double cy, double r) {
     final p = Paint()..color = kGreen.withOpacity(0.25)
       ..style = PaintingStyle.stroke..strokeWidth = 1.5;
-    final carW = r * 0.28; final carH = r * 0.72;
+    final carW = r*0.28; final carH = r*0.72;
     canvas.drawRRect(RRect.fromRectAndRadius(
       Rect.fromCenter(center: Offset(cx,cy), width: carW*2, height: carH*2),
       Radius.circular(carW*0.7)), p);
     canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy-carH*0.52), width: carW*1.5, height: carH*0.28),
+      Rect.fromCenter(center: Offset(cx,cy-carH*0.52), width: carW*1.5, height: carH*0.28),
       Radius.circular(4)),
       Paint()..color = kGreen.withOpacity(0.15));
     canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy-carH*0.52), width: carW*1.5, height: carH*0.28),
+      Rect.fromCenter(center: Offset(cx,cy-carH*0.52), width: carW*1.5, height: carH*0.28),
       Radius.circular(4)), p);
     canvas.drawRRect(RRect.fromRectAndRadius(
-      Rect.fromCenter(center: Offset(cx, cy+carH*0.44), width: carW*1.3, height: carH*0.2),
+      Rect.fromCenter(center: Offset(cx,cy+carH*0.44), width: carW*1.3, height: carH*0.2),
       Radius.circular(3)), p);
     for (final pos in [
       Offset(cx-carW*1.25, cy-carH*0.5), Offset(cx+carW*1.25, cy-carH*0.5),
@@ -761,37 +863,26 @@ class _BubblePainter extends CustomPainter {
         Offset(cx+(radius-2)*cos(a),cy+(radius-2)*sin(a)), tick);
     }
     _drawCar(canvas, cx, cy, radius);
-
-    // FRONT label
     final tp = TextPainter(
       text: TextSpan(text: 'FRONT',
-        style: TextStyle(color: kDim.withOpacity(0.7), fontSize: 9,
-          letterSpacing: 1)),
+        style: TextStyle(color: kDim.withOpacity(0.7), fontSize: 9, letterSpacing: 1)),
       textDirection: TextDirection.ltr)..layout();
     tp.paint(canvas, Offset(cx-tp.width/2, cy-radius+4));
 
-    // Arrows
-    final threshold = 1.0;
-    final ar = radius + 14; final as2 = 8.0;
-    final frontActive = pitch >  threshold;
-    final rearActive  = pitch < -threshold;
-    final leftActive  = roll  >  threshold;
-    final rightActive = roll  < -threshold;
-
+    final ar=radius+14; final as2=8.0;
     _drawArrow(canvas, Offset(cx,cy-ar),
       Offset(cx-as2,cy-ar+as2*1.4), Offset(cx+as2,cy-ar+as2*1.4),
-      frontActive ? kAmber : kBorder);
+      pitch >  1.0 ? kAmber : kBorder);
     _drawArrow(canvas, Offset(cx,cy+ar),
       Offset(cx-as2,cy+ar-as2*1.4), Offset(cx+as2,cy+ar-as2*1.4),
-      rearActive ? kAmber : kBorder);
+      pitch < -1.0 ? kAmber : kBorder);
     _drawArrow(canvas, Offset(cx+ar,cy),
       Offset(cx+ar-as2*1.4,cy-as2), Offset(cx+ar-as2*1.4,cy+as2),
-      rightActive ? kAmber : kBorder);
+      roll  < -1.0 ? kAmber : kBorder);
     _drawArrow(canvas, Offset(cx-ar,cy),
       Offset(cx-ar+as2*1.4,cy-as2), Offset(cx-ar+as2*1.4,cy+as2),
-      leftActive ? kAmber : kBorder);
+      roll  >  1.0 ? kAmber : kBorder);
 
-    // Bubble
     canvas.drawCircle(Offset(cx+dx+1,cy+dy+1), radius*0.16,
       Paint()..color=Colors.black.withOpacity(0.3));
     canvas.drawCircle(Offset(cx+dx,cy+dy), radius*0.16,
