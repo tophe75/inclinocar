@@ -201,13 +201,12 @@ class _HomePageState extends State<HomePage> {
     await for (final results in FlutterBluePlus.scanResults) {
       for (final r in results) {
         final mac = r.device.remoteId.toString();
-        final hasNUS = r.advertisementData.serviceUuids
-            .any((u) => u.toString().toLowerCase().contains('6e400001'));
-        final isKnown = _knownDevices.any((d) => d.mac == mac);
-        if (hasNUS || isKnown) {
-          if (!found.any((e) => e.device.remoteId == r.device.remoteId)) {
-            found.add(r);
-          }
+        final name = r.device.platformName;
+        final uuids = r.advertisementData.serviceUuids.map((u) => u.toString()).join(',');
+        debugPrint('SCAN: $name | $mac | uuids: $uuids');
+        // Accept all devices so user can see what's around
+        if (!found.any((e) => e.device.remoteId == r.device.remoteId)) {
+          found.add(r);
         }
       }
     }
@@ -234,7 +233,8 @@ class _HomePageState extends State<HomePage> {
             final mac   = r.device.remoteId.toString();
             final known = _knownDevices.where((d) => d.mac == mac).firstOrNull;
             return ListTile(
-              title: Text(known?.nickname ?? r.device.platformName,
+              title: Text(known?.nickname ?? 
+                (r.device.platformName.isNotEmpty ? r.device.platformName : 'Unknown'),
                 style: const TextStyle(color: kText)),
               subtitle: Text(mac, style: TextStyle(color: kDim, fontSize: 11)),
               trailing: Text('${r.rssi} dBm',
