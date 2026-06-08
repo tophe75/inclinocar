@@ -87,6 +87,7 @@ class _HomePageState extends State<HomePage> {
 
   List<KnownDevice> _knownDevices  = [];
   String?           _preferredMac;
+  List<String>      _scanLog        = [];
 
   @override
   void initState() {
@@ -147,6 +148,13 @@ class _HomePageState extends State<HomePage> {
     setState(() {});
   }
 
+  void _addLog(String msg) {
+    if (mounted) setState(() {
+      _scanLog.insert(0, msg);
+      if (_scanLog.length > 20) _scanLog.removeLast();
+    });
+  }
+
   Future<void> _requestPermissions() async {
     await [
       Permission.bluetoothScan,
@@ -198,7 +206,7 @@ class _HomePageState extends State<HomePage> {
         final advName  = r.advertisementData.advName;
         final isCore   = name == 'InclinoCore' || advName == 'InclinoCore';
         final isKnown  = _knownDevices.any((d) => d.mac == mac);
-        debugPrint('Found BLE: $mac name="$name" advName="$advName"');
+        _addLog('${isCore||isKnown?"✓":"·"} $mac "${name.isNotEmpty?name:advName}"');
         if ((isCore || isKnown) &&
             !found.any((e) => e.device.remoteId == r.device.remoteId)) {
           found.add(r);
@@ -210,9 +218,37 @@ class _HomePageState extends State<HomePage> {
     if (!mounted) return;
 
     if (found.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('No InclinoCore devices found. Check device is powered on.'),
-        backgroundColor: kRed));
+      // Show what was found for debugging
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: kCard,
+          title: const Text('No InclinoCore found',
+            style: TextStyle(color: kText, fontSize: 15)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Devices seen during scan:',
+                style: TextStyle(color: kDim, fontSize: 12)),
+              const SizedBox(height: 8),
+              if (_scanLog.isEmpty)
+                Text('Nothing found at all',
+                  style: TextStyle(color: kRed, fontSize: 12))
+              else
+                ..._scanLog.take(10).map((l) => Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 1),
+                  child: Text(l,
+                    style: TextStyle(color: kDim, fontSize: 10,
+                      fontFamily: 'monospace')))),
+            ],
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx),
+              child: Text('OK', style: TextStyle(color: kGreen))),
+          ],
+        ),
+      );
       return;
     }
 
