@@ -114,17 +114,18 @@ class _HomePageState extends State<HomePage> {
     setState(() { _scanning = true; _status = 'Scanning...'; });
 
     await FlutterBluePlus.startScan(
-      withNames: ['InclinoCore'],
+      withServices: [Guid(NUS_SERVICE)],
       timeout: const Duration(seconds: 10),
     );
 
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
-        // Prefer known MAC, accept any InclinoCore otherwise
+        // Prefer known MAC, accept any device advertising NUS service
         final macMatch = _knownMac != null &&
             r.device.remoteId.toString() == _knownMac;
-        final nameMatch = r.device.platformName == 'InclinoCore';
-        if (macMatch || nameMatch) {
+        final serviceMatch = r.advertisementData.serviceUuids
+            .any((u) => u.toString().toLowerCase() == NUS_SERVICE);
+        if (macMatch || serviceMatch) {
           FlutterBluePlus.stopScan();
           _connect(r.device);
           break;
@@ -147,7 +148,7 @@ class _HomePageState extends State<HomePage> {
     setState(() => _scanning = true);
 
     await FlutterBluePlus.startScan(
-      withNames: ['InclinoCore'],
+      withServices: [Guid(NUS_SERVICE)],
       timeout: const Duration(seconds: 8),
     );
 
