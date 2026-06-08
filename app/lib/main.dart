@@ -194,25 +194,33 @@ class _HomePageState extends State<HomePage> {
   Future<void> _manualScan() async {
     await _requestPermissions();
     final found = <ScanResult>[];
-    setState(() => _scanning = true);
+    setState(() { _scanning = true; _scanLog.clear(); });
 
-    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 8));
-
-    await for (final results in FlutterBluePlus.scanResults) {
+    // Use subscription — more reliable than await for on all Android versions
+    StreamSubscription? sub;
+    sub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
-        final mac      = r.device.remoteId.toString();
-        final name     = r.device.platformName;
-        final advName  = r.advertisementData.advName;
-        final isCore   = name == 'InclinoCore' || advName == 'InclinoCore';
-        final isKnown  = _knownDevices.any((d) => d.mac == mac);
+        final mac     = r.device.remoteId.toString();
+        final name    = r.device.platformName;
+        final advName = r.advertisementData.advName;
+        final isCore  = name == 'InclinoCore' || advName == 'InclinoCore';
+        final isKnown = _knownDevices.any((d) => d.mac == mac);
         _addLog('${isCore||isKnown?"✓":"·"} $mac "${name.isNotEmpty?name:advName}"');
         if ((isCore || isKnown) &&
             !found.any((e) => e.device.remoteId == r.device.remoteId)) {
           found.add(r);
         }
       }
-    }
+    });
 
+    await FlutterBluePlus.startScan(timeout: const Duration(seconds: 8));
+
+    // Wait for scan to finish
+    await FlutterBluePlus.isScanning.where((s) => s == false).first
+      .timeout(const Duration(seconds: 10), onTimeout: () => false);
+
+    sub.cancel();
+    await FlutterBluePlus.stopScan();
     setState(() => _scanning = false);
     if (!mounted) return;
 
