@@ -165,7 +165,6 @@ class _HomePageState extends State<HomePage> {
     setState(() { _scanning = true; _status = 'Scanning...'; });
 
     await FlutterBluePlus.startScan(
-      withServices: [Guid(NUS_SERVICE)],
       timeout: const Duration(seconds: 10),
     );
 
@@ -196,14 +195,19 @@ class _HomePageState extends State<HomePage> {
     setState(() => _scanning = true);
 
     await FlutterBluePlus.startScan(
-      withServices: [Guid(NUS_SERVICE)],
       timeout: const Duration(seconds: 8),
     );
 
     await for (final results in FlutterBluePlus.scanResults) {
       for (final r in results) {
-        if (!found.any((e) => e.device.remoteId == r.device.remoteId)) {
-          found.add(r);
+        final mac = r.device.remoteId.toString();
+        final hasNUS = r.advertisementData.serviceUuids
+            .any((u) => u.toString().toLowerCase().contains('6e400001'));
+        final isKnown = _knownDevices.any((d) => d.mac == mac);
+        if (hasNUS || isKnown) {
+          if (!found.any((e) => e.device.remoteId == r.device.remoteId)) {
+            found.add(r);
+          }
         }
       }
     }
