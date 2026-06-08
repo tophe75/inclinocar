@@ -13,7 +13,17 @@ Make sure you flash the device before you build the unit and mount it in the cas
 Requires Chrome or Edge on desktop.
 
 ---
+## Latest Releases
 
+🔧 **Core Firmware:** ![Firmware](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-*&label=Firmware&color=blue&logo=espressif)
+
+
+🤖 **Android:** ![Android](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=android-*&label=Android&color=green&logo=android)
+
+
+🍎 **iPhone:** ![iOS](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=ios-*&label=iOS&color=black&logo=apple)
+
+---
 ## Hardware
 
 ### What You Need
