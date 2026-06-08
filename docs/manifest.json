@@ -1,6 +1,6 @@
 {
   "name": "InclinoCar",
-  "version": "0.0.28",
+  "version": "0.0.30",
   "new_install_prompt_erase": true,
   "builds": [
     {
