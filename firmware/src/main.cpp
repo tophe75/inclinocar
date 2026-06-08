@@ -84,7 +84,7 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 void setupBLE() {
-  NimBLEDevice::init("InclinoCore");
+  NimBLEDevice::init(deviceNickname);
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
 
@@ -280,6 +280,7 @@ void setup() {
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
 
   loadOffsets();
+  loadNickname();
   loadBrightness();
   applyBrightness();
   setupBLE();
