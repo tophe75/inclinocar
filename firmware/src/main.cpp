@@ -148,7 +148,7 @@ void setupBLE() {
   pAdv->addServiceUUID(NUS_SERVICE_UUID);
   pAdv->setScanResponse(true);
   NimBLEDevice::startAdvertising();
-  Serial.println("BLE advertising as 'InclinoCar'");
+  Serial.printf("BLE advertising as '%s'\n", deviceNickname);
 }
 
 void saveBrightness() {
