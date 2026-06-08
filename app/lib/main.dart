@@ -164,7 +164,10 @@ class _HomePageState extends State<HomePage> {
 
     _scanSub = FlutterBluePlus.scanResults.listen((results) {
       for (final r in results) {
-        final mac = r.device.remoteId.toString();
+        final mac     = r.device.remoteId.toString();
+        final name    = r.device.platformName;
+        final advName = r.advertisementData.advName;
+        debugPrint('Auto scan: $mac name="$name" advName="$advName"');
         if (mac == _preferredMac) {
           FlutterBluePlus.stopScan();
           _connectAndSkipPin(r.device);
@@ -190,11 +193,12 @@ class _HomePageState extends State<HomePage> {
 
     await for (final results in FlutterBluePlus.scanResults) {
       for (final r in results) {
-        final name = r.device.platformName;
-        // Accept InclinoCore by name OR known MACs
-        final mac     = r.device.remoteId.toString();
-        final isCore  = name == 'InclinoCore';
-        final isKnown = _knownDevices.any((d) => d.mac == mac);
+        final mac      = r.device.remoteId.toString();
+        final name     = r.device.platformName;
+        final advName  = r.advertisementData.advName;
+        final isCore   = name == 'InclinoCore' || advName == 'InclinoCore';
+        final isKnown  = _knownDevices.any((d) => d.mac == mac);
+        debugPrint('Found BLE: $mac name="$name" advName="$advName"');
         if ((isCore || isKnown) &&
             !found.any((e) => e.device.remoteId == r.device.remoteId)) {
           found.add(r);
