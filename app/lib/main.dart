@@ -23,7 +23,7 @@ const Color kBorder   = Color(0xFF1E3A1E);
 const Color kAmber    = Color(0xFFFFB300);
 const Color kRed      = Color(0xFFEF5350);
 
-const String kAppVersion = '0.0.30';
+const String kAppVersion = '0.0.31';
 
 class KnownDevice {
   final String mac;

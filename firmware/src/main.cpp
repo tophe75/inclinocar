@@ -44,7 +44,7 @@ const float ALPHA    = 0.15f;  // lower = smoother, higher = more responsive
 // Brightness levels: 25%, 50%, 75%, 100%
 const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int     BRIGHTNESS_COUNT     = 4;
-int           brightnessIndex      = 1;  // default 50%
+int           brightnessIndex      = 0;  // default 25%
 
 // Brightness levels 0-3 → 64, 128, 192, 255
 
@@ -189,7 +189,7 @@ void applyBrightness() {
 
 void loadBrightness() {
   prefs.begin("inclinocar", true);
-  brightnessIndex = prefs.getInt("brightness", 1);  // default index 1 = 50%
+  brightnessIndex = prefs.getInt("brightness", 0);  // default 25%
   prefs.end();
   Serial.printf("Brightness loaded: index=%d val=%d\n", brightnessIndex, BRIGHTNESS_LEVELS[brightnessIndex]);
 }
@@ -198,7 +198,7 @@ void loadOffsets() {
   prefs.begin("inclinocar", true);
   pitchOffset     = prefs.getFloat("pitchOff", 0.0);
   rollOffset      = prefs.getFloat("rollOff",  0.0);
-  brightnessIndex = prefs.getInt("brightness", 1);  // default 50%
+  brightnessIndex = prefs.getInt("brightness", 0);  // default 25%
   prefs.end();
   Serial.printf("Offsets loaded: pitch=%.2f roll=%.2f brightness=%d\n", pitchOffset, rollOffset, brightnessIndex);
 }
@@ -254,7 +254,7 @@ void calibrate() {
   display.setCursor(0, 16); display.printf("  P: %.1f\n", pitchOffset);
   display.setCursor(0, 28); display.printf("  R: %.1f\n", rollOffset);
   display.display();
-  delay(1500);
+  delay(5000);
 }
 
 void showBrightnessMsg() {
@@ -341,7 +341,7 @@ void setup() {
   display.setCursor(0, 54); display.println(
     (pitchOffset != 0.0 || rollOffset != 0.0) ? "  Cal loaded" : "  Hold btn: cal");
   display.display();
-  delay(1500);
+  delay(5000);
 }
 
 void loop() {
