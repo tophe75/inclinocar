@@ -120,6 +120,8 @@ Hold the button for 1 second with the vehicle on flat level ground. The device t
 3. Select your device from the list (identified by MAC address)
 4. Enter the 4-digit PIN shown on the device display
 5. The app remembers your device and auto-connects next time
+=======
+Short press the buttom to cycle through 25%, 50%, 75% and 100% (default start value is 25%).
 
 The PIN is unique to each device and never changes.
 
