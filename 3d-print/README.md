@@ -11,7 +11,7 @@ This folder contains STL files for 3D printed parts.
 | File | Description | Status |
 |------|-------------|--------|
 | v26.1.0 | ESP32-C3 + OLED case | Publiched |
-| v26.1.0 | Roof bar mounting bracket | Publiched |
+| v26.1.0 | Tent bar mounting bracket | Publiched |
 
 ## Print Settings
 
