@@ -1,6 +1,10 @@
+
 # 3D Print Files
 
 This folder contains STL files for 3D printed parts.
+
+<img width="492" height="440" alt="InclinoCore_left" src="https://github.com/user-attachments/assets/ecff394c-1392-4f43-8052-3152e09ba5b9" />
+<img width="665" height="347" alt="InclinoCore_all_explode" src="https://github.com/user-attachments/assets/86df0ca6-36e8-49b0-98e4-5e194bbeaa54" />
 
 ## Parts
 
