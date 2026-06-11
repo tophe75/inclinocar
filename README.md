@@ -93,7 +93,7 @@ Hold the button for 1 second with the vehicle on flat ground. The device average
 
 ### Display brigthness
 
-Short press the buttom to cycle through 25%, 50%, 75% and 100% (default start value is 50%).
+Short press the buttom to cycle through 25%, 50%, 75% and 100% (default start value is 25%).
 
 ### Bluetooth App
 
