@@ -1,29 +1,29 @@
 # InclinoCar
 
-Rooftop tent leveling assistant using ESP32-C3 and MPU-6050. Displays real-time pitch and roll on an OLED screen and sends data to the InclinoCar Android app via Bluetooth.
+Rooftop tent leveling assistant using ESP32-C3 and MPU-6050. Displays real-time pitch and roll on an OLED screen and connects to the InclinoCar Android app via Bluetooth.
 
 ## Web Installer
 
 Flash firmware directly in your browser — no drivers or software needed.
 
-Make sure you flash the device before you build the unit and mount it in the case, the 'original' case has no hole/button to press the boot button once assembled
+> ⚠️ Flash the device **before** assembling it into the case — the original case has no access hole for the BOOT button once assembled.
 
 👉 **[tophe75.github.io/inclinocar](https://tophe75.github.io/inclinocar/)**
 
 Requires Chrome or Edge on desktop.
 
 ---
+
 ## Latest Releases
 
-🔧 **Core Firmware:** ![Firmware](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-*&label=Firmware&color=blue&logo=espressif)
-
+🔧 **Firmware:** ![Firmware](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-*&label=Firmware&color=blue&logo=espressif)
 
 🤖 **Android:** ![Android](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=android-*&label=Android&color=green&logo=android)
 
-
-🍎 **iPhone:** ![iOS](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=ios-*&label=iOS&color=black&logo=apple)
+🍎 **iOS:** ![iOS](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=ios-*&label=iOS&color=black&logo=apple)
 
 ---
+
 ## Hardware
 
 ### What You Need
@@ -52,12 +52,13 @@ ESP32-C3          MPU-6050 GY-521
 GND       →       GND
 GPIO6     →       SDA
 GPIO7     →       SCL
-GND       →       AD0        (sets address to 0x68)
+GND       →       AD0        (sets I2C address to 0x68)
 
 ESP32-C3          Button
 ─────────         ──────
 GPIO5     →       Terminal 1
 GND       →       Terminal 2
+(internal pull-up — no resistor needed)
 ```
 
 ---
@@ -74,36 +75,63 @@ GND       →       Terminal 2
 
 ## Usage
 
-### Display
+### Boot Screen
+
+On power-up the device shows the device nickname, firmware version, MAC address and PIN for 5 seconds:
 
 ```
   InclinoCore
-  ──────────────────
+  v0.0.31
+  E8:3D:C1:9E:43:38
+  PIN: 9208
+  Cal loaded
+```
+
+### Display
+
+```
+  InclinoCore        PIN:9208
+  ──────────────────────────
   P  +2.3°
   R  -1.1°
-  ──────────────────
+  ──────────────────────────
   Adjust...            ← or ** LEVEL ** when within 1°
 ```
 
-`BT` in the top right corner indicates a Bluetooth app connection.
+`BT` appears in the top right when the app is connected.
+
+### Button
+
+| Action | Function |
+|--------|----------|
+| Short press | Cycle display brightness (25% → 50% → 75% → 100% → 25%) |
+| Hold 1 second | Calibrate (keep device still on flat ground) |
+
+Default brightness on first boot is 25%.
 
 ### Calibration
 
-Hold the button for 1 second with the vehicle on flat ground. The device averages 50 readings and saves the offsets to flash memory — they survive reboots.
+Hold the button for 1 second with the vehicle on flat level ground. The device takes 50 readings and saves the offsets to flash — they survive reboots and firmware updates.
 
-### Display brigthness
+### Bluetooth Pairing
 
-Short press the buttom to cycle through 25%, 50%, 75% and 100% (default start value is 50%).
+1. Open the InclinoCar app
+2. Tap the **⋮** menu → **Scan for InclinoCore**
+3. Select your device from the list (identified by MAC address)
+4. Enter the 4-digit PIN shown on the device display
+5. The app remembers your device and auto-connects next time
 
-### Bluetooth App
+The PIN is unique to each device and never changes.
 
-The device advertises as **InclinoCore** using the Nordic UART Service (NUS). It sends JSON data every 100ms:
+### Bluetooth Data
+
+The device sends JSON over Nordic UART Service (NUS) every 100ms:
 
 ```json
 {"p":1.2,"r":0.3,"n":"InclinoCore"}
 ```
 
-Where `p` = pitch and `r` = roll in degrees.
+`p` = pitch (degrees), `r` = roll (degrees), `n` = device nickname
 
 ---
 
@@ -111,41 +139,66 @@ Where `p` = pitch and `r` = roll in degrees.
 
 | Problem | Solution |
 |---------|----------|
-| Display blank | Check SDA=GPIO6, SCL=GPIO7, VCC=3.3V |
+| Display blank after flash | Check SDA=GPIO6, SCL=GPIO7, VCC=3.3V |
 | IMU not found | Check MPU-6050 wiring, AD0 must be GND |
-| Values drifting | Hold button to calibrate |
-| BT- on display | Open InclinoCar app and connect |
+| Values drifting | Hold button 1s to calibrate |
+| App can't find device | Menu → Scan for InclinoCore, check device is powered on |
+| Wrong PIN | Check the device display — PIN is shown on boot screen and top-right when not connected |
 | Web installer fails | Hard refresh (Ctrl+Shift+R) or use incognito window |
+| NVS errors in serial log | Flash with Erase device selected in web installer |
+
+---
+
+## Android App
+
+Download the latest `InclinoCar-installer.apk` from [GitHub Releases](https://github.com/tophe75/inclinocar/releases).
+
+**Install instructions:**
+1. Download the APK on your Android phone
+2. Settings → Security → Install unknown apps → allow your browser
+3. Open the APK and tap Install
+
+**Features:**
+- Auto-connects to last known device on startup
+- PIN-based pairing for identifying your device among multiple units
+- Bubble level with car silhouette and directional arrows
+- Pitch and roll readout with colour coding (green < 1°, amber < 3°, red ≥ 3°)
+- Calibrate remotely from the app
+- Set a custom nickname for your device
+- Known devices list with ability to remove saved devices
+- Screen-on mode to keep display active while leveling
+
+---
+
+## 3D Printed Parts
+
+STL files for cases and mounting brackets are in the `3d-print/` folder. Print in PETG or ABS — avoid PLA as it can warp in a hot car.
 
 ---
 
 ## Project Structure
 
 ```
-firmware/          PlatformIO project (ESP32-C3)
-app/               Flutter app (Android + iOS)
-  app/assets/      App icon and assets
-docs/              GitHub Pages web installer
-3d-print/          STL files for cases and mounting brackets
-scripts/           Build utilities
-.github/workflows/ CI/CD
+firmware/           PlatformIO project (ESP32-C3 core unit)
+app/                Flutter app (Android + iOS)
+  app/lib/          Dart source code
+  app/android/      Android build files and icons
+  app/ios/          iOS build files and icons
+  app/assets/       App assets (master icon, Play Store icon)
+docs/               GitHub Pages web installer
+3d-print/           STL files for cases and mounting brackets
+scripts/            Build utilities (version injection)
+.github/workflows/  CI/CD pipelines
 ```
-
-## Android App
-
-Download the latest APK from [GitHub Releases](https://github.com/tophe75/inclinocar/releases) and install it on your Android phone.
-
-**Enable unknown sources:**
-Settings → Security → Install unknown apps → allow your browser
-
-The app connects to the device via Bluetooth, shows a live bubble level indicator and pitch/roll readings, and lets you trigger calibration remotely.
-
-## 3D Printed Parts
-
-STL files for cases and mounting brackets are in the `3d-print/` folder. Print in PETG or ABS — avoid PLA as it can warp in a hot car.
 
 ## Building Locally
 
-Requires [VS Code](https://code.visualstudio.com/) and [PlatformIO](https://platformio.org/install/ide?install=vscode).
+**Firmware** — requires [VS Code](https://code.visualstudio.com/) and [PlatformIO](https://platformio.org/install/ide?install=vscode).
+Open the `firmware/` folder in VS Code and click **Upload**.
 
-Open the `firmware/` folder in VS Code, then click **Upload**.
+**App** — requires [Flutter](https://flutter.dev/docs/get-started/install) SDK.
+```bash
+cd app
+flutter pub get
+flutter build apk --release
+```
