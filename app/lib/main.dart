@@ -23,7 +23,7 @@ const Color kBorder   = Color(0xFF1E3A1E);
 const Color kAmber    = Color(0xFFFFB300);
 const Color kRed      = Color(0xFFEF5350);
 
-const String kAppVersion = '0.0.31';
+const String kAppVersion = '0.0.32';
 
 class KnownDevice {
   final String mac;
@@ -203,7 +203,7 @@ class _HomePageState extends State<HomePage> {
         final mac     = r.device.remoteId.toString();
         final name    = r.device.platformName;
         final advName = r.advertisementData.advName;
-        final isCore  = name == 'InclinoCore' || advName == 'InclinoCore';
+        final isCore  = name.startsWith('Core#') || advName.startsWith('Core#');
         final isKnown = _knownDevices.any((d) => d.mac == mac);
         _addLog('${isCore||isKnown?"✓":"·"} $mac "${name.isNotEmpty?name:advName}"');
         if ((isCore || isKnown) &&

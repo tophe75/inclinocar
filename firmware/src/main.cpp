@@ -22,7 +22,15 @@
 
 // Device nickname (user settable)
 char deviceNickname[32] = "InclinoCore";
+char bleAdvName[32]    = "InclinoCore";  // BLE advertising name — Core#MAC, never changes
 uint16_t devicePIN = 0;
+
+void generateBleAdvName() {
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  snprintf(bleAdvName, sizeof(bleAdvName), "Core#%02X%02X%02X%02X%02X%02X",
+    mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
 
 uint16_t generatePIN() {
   // Deterministic PIN from MAC — same device always same PIN
@@ -123,7 +131,7 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
 };
 
 void setupBLE() {
-  NimBLEDevice::init(deviceNickname);
+  NimBLEDevice::init(bleAdvName);
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
 
@@ -148,7 +156,7 @@ void setupBLE() {
   pAdv->addServiceUUID(NUS_SERVICE_UUID);
   pAdv->setScanResponse(true);
   NimBLEDevice::startAdvertising();
-  Serial.printf("BLE advertising as '%s'\n", deviceNickname);
+  Serial.printf("BLE advertising as '%s' nickname='%s'\n", bleAdvName, deviceNickname);
 }
 
 void saveBrightness() {
@@ -162,8 +170,7 @@ void saveNickname() {
   prefs.putString("nickname", deviceNickname);
   prefs.end();
   // Update BLE advertising name and restart advertising
-  NimBLEDevice::setDeviceName(deviceNickname);
-  NimBLEDevice::startAdvertising();
+  // BLE advertising name stays as bleAdvName — nickname is display only
 }
 
 void loadNickname() {
@@ -322,6 +329,7 @@ void setup() {
   loadOffsets();
   loadNickname();
   loadBrightness();
+  generateBleAdvName();
   devicePIN = generatePIN();
   Serial.printf("Device PIN: %04d\n", devicePIN);
   applyBrightness();
