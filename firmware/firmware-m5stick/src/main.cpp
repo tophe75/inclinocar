@@ -1,5 +1,5 @@
 #include <Arduino.h>
-#include <M5StickCPlus.h>
+#include <M5Unified.h>
 #include <Preferences.h>
 #include <NimBLEDevice.h>
 #include <esp_mac.h>
@@ -11,7 +11,6 @@
 #define NUS_RX_UUID       "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
 #define NUS_TX_UUID       "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-// ── Colors (RGB565) ──────────────────────────────────────────
 #define C_BG    TFT_BLACK
 #define C_GREEN 0x07E0
 #define C_AMBER 0xFD20
@@ -44,8 +43,7 @@ float smoothedPitch = 0.0;
 float smoothedRoll  = 0.0;
 const float ALPHA   = 0.15f;
 
-// Brightness 0-255 via AXP192 (7=low, 15=max on M5StickC Plus)
-const uint8_t BRIGHTNESS_LEVELS[] = {7, 9, 12, 15};
+const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int     BRIGHTNESS_COUNT    = 4;
 int           brightnessIndex     = 0;
 
@@ -164,7 +162,7 @@ void loadOffsets() {
 }
 
 void applyBrightness() {
-  M5.Axp.ScreenBreath(BRIGHTNESS_LEVELS[brightnessIndex]);
+  M5.Display.setBrightness(BRIGHTNESS_LEVELS[brightnessIndex]);
 }
 
 void saveBrightness() {
@@ -173,90 +171,87 @@ void saveBrightness() {
   prefs.end();
 }
 
-// ── Display helpers ──────────────────────────────────────────
-void lcdClear() { M5.Lcd.fillScreen(C_BG); }
-
+// ── Display ──────────────────────────────────────────────────
 void drawMainScreen(float pitch, float roll) {
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
-  lcdClear();
 
-  // Header row
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setTextColor(C_GREEN, C_BG);
-  M5.Lcd.setCursor(4, 4);
-  M5.Lcd.print(deviceNickname);
+  M5.Display.fillScreen(C_BG);
 
-  // BT / PIN
+  // Header
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_GREEN, C_BG);
+  M5.Display.setCursor(4, 4);
+  M5.Display.print(deviceNickname);
+
   if (bleConnected && pinVerified) {
-    M5.Lcd.setTextColor(C_GREEN, C_BG);
-    M5.Lcd.setCursor(106, 4);
-    M5.Lcd.print("BT");
+    M5.Display.setCursor(106, 4);
+    M5.Display.print("BT");
   } else if (!bleConnected) {
-    M5.Lcd.setTextColor(C_DIM, C_BG);
-    M5.Lcd.setCursor(74, 4);
+    M5.Display.setTextColor(C_DIM, C_BG);
+    M5.Display.setCursor(74, 4);
     char pinStr[10];
     snprintf(pinStr, sizeof(pinStr), "%04d", devicePIN);
-    M5.Lcd.print(pinStr);
+    M5.Display.print(pinStr);
   }
 
-  M5.Lcd.drawLine(0, 18, 135, 18, C_DIM);
+  M5.Display.drawLine(0, 18, 135, 18, C_DIM);
 
   // Pitch
   uint16_t pc = abs(pitch) < 1.0 ? C_GREEN : (abs(pitch) < 3.0 ? C_AMBER : C_RED);
-  M5.Lcd.setTextColor(C_DIM, C_BG);
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setCursor(4, 26);
-  M5.Lcd.print("PITCH");
-  M5.Lcd.setTextColor(pc, C_BG);
-  M5.Lcd.setTextSize(3);
-  M5.Lcd.setCursor(4, 40);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setTextSize(1);
+  M5.Display.setCursor(4, 26);
+  M5.Display.print("PITCH");
+  M5.Display.setTextColor(pc, C_BG);
+  M5.Display.setTextSize(3);
+  M5.Display.setCursor(4, 40);
   char buf[12];
   snprintf(buf, sizeof(buf), "%+.1f", pitch);
-  M5.Lcd.print(buf);
+  M5.Display.print(buf);
 
-  M5.Lcd.drawLine(0, 100, 135, 100, C_DIM);
+  M5.Display.drawLine(0, 100, 135, 100, C_DIM);
 
   // Roll
   uint16_t rc = abs(roll) < 1.0 ? C_GREEN : (abs(roll) < 3.0 ? C_AMBER : C_RED);
-  M5.Lcd.setTextColor(C_DIM, C_BG);
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setCursor(4, 108);
-  M5.Lcd.print("ROLL");
-  M5.Lcd.setTextColor(rc, C_BG);
-  M5.Lcd.setTextSize(3);
-  M5.Lcd.setCursor(4, 122);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setTextSize(1);
+  M5.Display.setCursor(4, 108);
+  M5.Display.print("ROLL");
+  M5.Display.setTextColor(rc, C_BG);
+  M5.Display.setTextSize(3);
+  M5.Display.setCursor(4, 122);
   snprintf(buf, sizeof(buf), "%+.1f", roll);
-  M5.Lcd.print(buf);
+  M5.Display.print(buf);
 
-  M5.Lcd.drawLine(0, 182, 135, 182, C_DIM);
+  M5.Display.drawLine(0, 182, 135, 182, C_DIM);
 
   // Status
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setTextColor(level ? C_GREEN : C_AMBER, C_BG);
-  M5.Lcd.setCursor(4, 192);
-  M5.Lcd.print(level ? "** LEVEL **" : "Adjust...");
+  M5.Display.setTextSize(2);
+  M5.Display.setTextColor(level ? C_GREEN : C_AMBER, C_BG);
+  M5.Display.setCursor(4, 192);
+  M5.Display.print(level ? "** LEVEL **" : "Adjust...");
 
   // Version
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setTextColor(C_DIM, C_BG);
-  M5.Lcd.setCursor(4, 226);
-  M5.Lcd.print(FW_VERSION);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setCursor(4, 226);
+  M5.Display.print(FW_VERSION);
 }
 
 // ── Calibration ──────────────────────────────────────────────
 void calibrate() {
-  lcdClear();
-  M5.Lcd.setTextColor(C_AMBER, C_BG);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor(4, 80);
-  M5.Lcd.print("Calibrating");
-  M5.Lcd.setCursor(4, 106);
-  M5.Lcd.print("Keep still!");
+  M5.Display.fillScreen(C_BG);
+  M5.Display.setTextColor(C_AMBER, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 80);
+  M5.Display.print("Calibrating");
+  M5.Display.setCursor(4, 106);
+  M5.Display.print("Keep still!");
   delay(500);
 
   float pSum = 0, rSum = 0;
-  float ax, ay, az;
   for (int i = 0; i < 50; i++) {
+    float ax, ay, az;
     M5.Imu.getAccelData(&ax, &ay, &az);
     float rp = atan2(-ax, sqrt(ay*ay + az*az)) * 180.0/PI;
     float rr = atan2(ay, az) * 180.0/PI;
@@ -268,16 +263,16 @@ void calibrate() {
   rollOffset  = rSum / 50.0;
   saveOffsets();
 
-  lcdClear();
-  M5.Lcd.setTextColor(C_GREEN, C_BG);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor(4, 80);
-  M5.Lcd.print("Cal saved!");
+  M5.Display.fillScreen(C_BG);
+  M5.Display.setTextColor(C_GREEN, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 80);
+  M5.Display.print("Cal saved!");
   char buf[20];
   snprintf(buf, sizeof(buf), "P: %.1f", pitchOffset);
-  M5.Lcd.setCursor(4, 110); M5.Lcd.print(buf);
+  M5.Display.setCursor(4, 110); M5.Display.print(buf);
   snprintf(buf, sizeof(buf), "R: %.1f", rollOffset);
-  M5.Lcd.setCursor(4, 134); M5.Lcd.print(buf);
+  M5.Display.setCursor(4, 134); M5.Display.print(buf);
   delay(3000);
 }
 
@@ -285,17 +280,17 @@ void cycleBrightness() {
   brightnessIndex = (brightnessIndex + 1) % BRIGHTNESS_COUNT;
   applyBrightness();
   saveBrightness();
-  lcdClear();
-  M5.Lcd.setTextColor(C_GREEN, C_BG);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor(4, 90);
-  M5.Lcd.print("Brightness");
+  M5.Display.fillScreen(C_BG);
+  M5.Display.setTextColor(C_GREEN, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 90);
+  M5.Display.print("Brightness");
   int pct = (brightnessIndex + 1) * 25;
   char buf[8];
   snprintf(buf, sizeof(buf), "%d%%", pct);
-  M5.Lcd.setTextSize(4);
-  M5.Lcd.setCursor(30, 120);
-  M5.Lcd.print(buf);
+  M5.Display.setTextSize(4);
+  M5.Display.setCursor(30, 120);
+  M5.Display.print(buf);
   delay(800);
 }
 
@@ -318,26 +313,26 @@ void handleButton() {
 
 // ── Setup ────────────────────────────────────────────────────
 void setup() {
-  // M5.begin() inits LCD, IMU, AXP192, Serial
-  M5.begin();
-  M5.Lcd.setRotation(0);  // Portrait — 135w x 240h
-  M5.Lcd.fillScreen(C_BG);
+  auto cfg = M5.config();
+  M5.begin(cfg);
 
+  Serial.begin(115200);
   Serial.println("InclinoCore M5StickC Plus starting...");
 
-  // Splash
-  M5.Lcd.setTextColor(C_GREEN, C_BG);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor(4, 80);
-  M5.Lcd.print("InclinoCore");
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setTextColor(C_DIM, C_BG);
-  M5.Lcd.setCursor(4, 108);
-  M5.Lcd.print(FW_VERSION);
-  M5.Lcd.setCursor(4, 124);
-  M5.Lcd.print("Starting...");
+  M5.Display.setRotation(0);  // Portrait 135x240
+  M5.Display.fillScreen(C_BG);
+  M5.Display.setTextColor(C_GREEN, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 80);
+  M5.Display.print("InclinoCore");
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setCursor(4, 108);
+  M5.Display.print(FW_VERSION);
+  M5.Display.setCursor(4, 124);
+  M5.Display.print("Starting...");
 
-  M5.Imu.Init();
+  M5.Imu.init();
 
   loadOffsets();
   loadNickname();
@@ -353,27 +348,27 @@ void setup() {
   snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
     mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
 
-  lcdClear();
-  M5.Lcd.setTextColor(C_GREEN, C_BG);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor(4, 20);
-  M5.Lcd.print(deviceNickname);
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setTextColor(C_DIM, C_BG);
-  M5.Lcd.setCursor(4, 54);
-  M5.Lcd.print(FW_VERSION);
-  M5.Lcd.setCursor(4, 70);
-  M5.Lcd.print(macStr);
-  M5.Lcd.setTextColor(C_WHITE, C_BG);
-  M5.Lcd.setTextSize(2);
-  M5.Lcd.setCursor(4, 100);
+  M5.Display.fillScreen(C_BG);
+  M5.Display.setTextColor(C_GREEN, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 20);
+  M5.Display.print(deviceNickname);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setCursor(4, 54);
+  M5.Display.print(FW_VERSION);
+  M5.Display.setCursor(4, 70);
+  M5.Display.print(macStr);
+  M5.Display.setTextColor(C_WHITE, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 100);
   char pinStr[14];
   snprintf(pinStr, sizeof(pinStr), "PIN: %04d", devicePIN);
-  M5.Lcd.print(pinStr);
-  M5.Lcd.setTextSize(1);
-  M5.Lcd.setTextColor(C_DIM, C_BG);
-  M5.Lcd.setCursor(4, 140);
-  M5.Lcd.print((pitchOffset != 0.0 || rollOffset != 0.0) ?
+  M5.Display.print(pinStr);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setCursor(4, 140);
+  M5.Display.print((pitchOffset != 0.0 || rollOffset != 0.0) ?
     "Cal loaded" : "Hold BtnA: calibrate");
 
   delay(5000);
