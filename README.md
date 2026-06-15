@@ -16,7 +16,9 @@ Requires Chrome or Edge on desktop.
 
 ## Latest Releases
 
-🔧 **Firmware:** ![Firmware](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-*&label=Firmware&color=blue&logo=espressif)
+🔧 **Firmware:**
+- ESP32-C3 Super Mini ![ESP32-C3](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-esp32c3-*&label=ESP32-C3&color=blue&logo=espressif)
+- M5StickC Plus ![M5StickC](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-m5stick-*&label=M5StickC%20Plus&color=blue&logo=espressif)
 
 🤖 **Android:** ![Android](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=android-*&label=Android&color=green&logo=android)
 
