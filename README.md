@@ -36,6 +36,9 @@ Requires Chrome or Edge on desktop.
 - [Momentary push button](https://www.amazon.com/Gebildet-Momentary-Button-Switch-Railway/dp/B07YDHP3HS)
 - [Jumper wires (26 AWG Silicone)](https://www.amazon.com/Fermerry-Stranded-Colors-Flexible-electrical/dp/B089D3T1JD)
 
+If you have a [M5StickCPlus](https://shop.m5stack.com/products/m5stickc-plus-esp32-pico-mini-iot-development-kit) there is a version, however I don't like the drift and inconsistency of the device
+
+
 ### Wiring
 
 All devices share the same I2C bus on GPIO6 and GPIO7.
