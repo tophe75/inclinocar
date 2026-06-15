@@ -40,6 +40,8 @@ jobs:
           cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/bootloader.bin docs/bins/m5stick/
           cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/partitions.bin  docs/bins/m5stick/
           cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/firmware.bin    docs/bins/m5stick/
+          # boot_app0.bin required for ESP32 OTA boot
+          find ~/.platformio -name "boot_app0.bin" | head -1 | xargs -I{} cp {} docs/bins/m5stick/
 
       - name: Update manifest
         run: |
