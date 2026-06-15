@@ -193,7 +193,7 @@ void drawMainScreen(float pitch, float roll) {
     M5.Display.print(pinStr);
   }
 
-  // ── PITCH — label small, value big ──
+  // ── PITCH ──
   uint16_t pc = abs(pitch) < 1.0 ? C_GREEN : (abs(pitch) < 3.0 ? C_AMBER : C_RED);
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setTextSize(1);
@@ -206,7 +206,7 @@ void drawMainScreen(float pitch, float roll) {
   M5.Display.setCursor(4, 32);
   M5.Display.print(buf);
 
-  // ── ROLL — label small, value big ──
+  // ── ROLL ──
   uint16_t rc = abs(roll) < 1.0 ? C_GREEN : (abs(roll) < 3.0 ? C_AMBER : C_RED);
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setTextSize(1);
@@ -217,6 +217,38 @@ void drawMainScreen(float pitch, float roll) {
   snprintf(buf, sizeof(buf), "%+.1f", roll);
   M5.Display.setCursor(4, 90);
   M5.Display.print(buf);
+
+  // ── Battery — right side centre ──
+  int   batPct     = M5.Power.getBatteryLevel();
+  bool  charging   = M5.Power.isCharging();
+  uint16_t batColor = batPct > 50 ? C_GREEN : (batPct > 20 ? C_AMBER : C_RED);
+
+  // Percentage
+  M5.Display.setTextColor(batColor, C_BG);
+  M5.Display.setTextSize(2);
+  char batStr[8];
+  snprintf(batStr, sizeof(batStr), "%d%%", batPct);
+  // Right-align in x=170-236
+  int batX = 236 - strlen(batStr) * 12;
+  M5.Display.setCursor(batX, 42);
+  M5.Display.print(batStr);
+
+  // Charging indicator or battery bar
+  M5.Display.setTextSize(1);
+  if (charging) {
+    M5.Display.setTextColor(C_AMBER, C_BG);
+    M5.Display.setCursor(204, 66);
+    M5.Display.print("CHG");
+  }
+
+  // Battery bar — outline
+  M5.Display.drawRect(170, 78, 60, 14, C_DIM);
+  // Terminal nub
+  M5.Display.fillRect(230, 82, 4, 6, C_DIM);
+  // Fill based on percentage
+  int fillW = (56 * batPct) / 100;
+  uint16_t fillColor = batPct > 50 ? C_GREEN : (batPct > 20 ? C_AMBER : C_RED);
+  if (fillW > 0) M5.Display.fillRect(172, 80, fillW, 10, fillColor);
 
   // ── Status bottom right ──
   M5.Display.setTextSize(1);
