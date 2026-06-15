@@ -37,9 +37,9 @@ jobs:
       - name: Copy binaries
         run: |
           mkdir -p docs/bins/m5stick
-          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/bootloader.bin docs/bins/m5stick/
-          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/partitions.bin  docs/bins/m5stick/
-          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/firmware.bin    docs/bins/m5stick/
+          cp firmware/firmware-m5stick/.pio/build/m5stick-c/bootloader.bin docs/bins/m5stick/
+          cp firmware/firmware-m5stick/.pio/build/m5stick-c/partitions.bin  docs/bins/m5stick/
+          cp firmware/firmware-m5stick/.pio/build/m5stick-c/firmware.bin    docs/bins/m5stick/
 
       - name: Update manifest
         run: |
