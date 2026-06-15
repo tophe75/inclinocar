@@ -16,7 +16,9 @@ Requires Chrome or Edge on desktop.
 
 ## Latest Releases
 
-🔧 **Firmware:** ![Firmware](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-*&label=Firmware&color=blue&logo=espressif)
+🔧 **Firmware:**
+- ESP32-C3 Super Mini ![ESP32-C3](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-esp32c3-*&label=ESP32-C3&color=blue&logo=espressif)
+- M5StickC Plus ![M5StickC](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-m5stick-*&label=M5StickC%20Plus&color=blue&logo=espressif)
 
 🤖 **Android:** ![Android](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=android-*&label=Android&color=green&logo=android)
 
@@ -33,6 +35,9 @@ Requires Chrome or Edge on desktop.
 - [MPU-6050 GY-521 accelerometer/gyroscope](https://www.amazon.com/EPLZON-MPU-6050-Accelerometer-Gyroscope-Converter/dp/B09TVYVC6X)
 - [Momentary push button](https://www.amazon.com/Gebildet-Momentary-Button-Switch-Railway/dp/B07YDHP3HS)
 - [Jumper wires (26 AWG Silicone)](https://www.amazon.com/Fermerry-Stranded-Colors-Flexible-electrical/dp/B089D3T1JD)
+
+If you have a [M5StickCPlus](https://shop.m5stack.com/products/m5stickc-plus-esp32-pico-mini-iot-development-kit) there is a version, however I don't like the drift and inconsistency of the device
+
 
 ### Wiring
 
