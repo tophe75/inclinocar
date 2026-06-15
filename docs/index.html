@@ -30,36 +30,37 @@
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 40px;
-      max-width: 500px;
+      max-width: 520px;
       width: 100%;
       text-align: center;
     }
-    .logo {
-      font-size: 2.2rem;
-      font-weight: 200;
-      letter-spacing: 6px;
-      color: var(--green);
-      margin-bottom: 8px;
-    }
-    .tagline {
+    .logo { font-size: 2.2rem; font-weight: 200; letter-spacing: 6px; color: var(--green); margin-bottom: 6px; }
+    .tagline { color: var(--dim); font-size: 0.85rem; letter-spacing: 2px; text-transform: uppercase; margin-bottom: 28px; }
+
+    .selector-group { text-align: left; margin-bottom: 14px; }
+    .selector-group label { display: block; font-size: 0.75rem; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
+
+    /* Hardware toggle buttons */
+    .hw-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
+    .hw-btn {
+      flex: 1;
+      padding: 10px;
+      background: #0a120a;
       color: var(--dim);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      cursor: pointer;
       font-size: 0.85rem;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      margin-bottom: 28px;
+      font-family: inherit;
+      transition: all 0.15s;
     }
-    .selector-group {
-      text-align: left;
-      margin-bottom: 16px;
+    .hw-btn.active {
+      background: #1a4a1a;
+      color: var(--green);
+      border-color: var(--green);
     }
-    .selector-group label {
-      display: block;
-      font-size: 0.75rem;
-      color: var(--dim);
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      margin-bottom: 6px;
-    }
+    .hw-btn:hover:not(.active) { border-color: var(--dim); color: var(--text); }
+
     select {
       width: 100%;
       background: #0a120a;
@@ -73,6 +74,7 @@
       cursor: pointer;
     }
     select:focus { outline: none; border-color: var(--green); }
+
     .info {
       background: #0a120a;
       border: 1px solid var(--border);
@@ -86,6 +88,7 @@
       min-height: 40px;
     }
     .info strong { color: var(--text); }
+
     esp-web-install-button { display: block; margin-bottom: 16px; }
     esp-web-install-button::part(button) {
       background: #1a4a1a;
@@ -101,19 +104,10 @@
       transition: background 0.2s;
     }
     esp-web-install-button::part(button):hover { background: #254a25; }
-    .footer {
-      font-size: 0.75rem;
-      color: var(--dim);
-    }
+
+    .footer { font-size: 0.75rem; color: var(--dim); }
     .footer a { color: var(--dim); }
-    .badge {
-      display: inline-block;
-      font-size: 0.7rem;
-      padding: 2px 7px;
-      border-radius: 10px;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
+    .badge { display: inline-block; font-size: 0.7rem; padding: 2px 7px; border-radius: 10px; margin-left: 6px; vertical-align: middle; }
     .badge-latest { background: #1a4a1a; color: var(--green); border: 1px solid var(--green); }
     .badge-old    { background: #0a120a; color: var(--dim);   border: 1px solid var(--border); }
   </style>
@@ -123,6 +117,20 @@
   <div class="logo">INCLINOCAR</div>
   <div class="tagline">Rooftop Tent Leveling System</div>
 
+  <!-- Hardware selector -->
+  <div class="selector-group">
+    <label>Hardware</label>
+    <div class="hw-toggle">
+      <button class="hw-btn active" id="btn-esp32c3" onclick="selectHardware('esp32c3')">
+        ESP32-C3 Super Mini
+      </button>
+      <button class="hw-btn" id="btn-m5stick" onclick="selectHardware('m5stick')">
+        M5StickC Plus
+      </button>
+    </div>
+  </div>
+
+  <!-- Version selector -->
   <div class="selector-group">
     <label>Version</label>
     <select id="version-select" onchange="onVersionChange()">
@@ -130,17 +138,17 @@
     </select>
   </div>
 
-  <div class="info" id="fw-info">Select a version to install.</div>
+  <div class="info" id="fw-info">Select hardware and version to install.</div>
 
-  <esp-web-install-button id="install-btn" manifest="manifest.json">
+  <esp-web-install-button id="install-btn" manifest="manifest-esp32c3.json">
     <span slot="unsupported">
-      Web Serial not supported. Please use <strong>Chrome</strong> or <strong>Edge</strong>.
+      Web Serial not supported. Use <strong>Chrome</strong> or <strong>Edge</strong>.
     </span>
   </esp-web-install-button>
 
   <div class="footer">
     <a href="https://github.com/tophe75/inclinocar" target="_blank">github.com/tophe75/inclinocar</a>
-    &nbsp;·&nbsp; Chrome / Edge only &nbsp;·&nbsp; Hold BOOT → plug USB → release BOOT
+    &nbsp;·&nbsp; Chrome / Edge only
   </div>
 </div>
 
@@ -148,21 +156,53 @@
 const REPO  = 'tophe75/inclinocar';
 const PAGES = 'https://tophe75.github.io/inclinocar';
 
-// Fetch all fw-v* and v* releases from GitHub API
+// Hardware config
+const HW = {
+  esp32c3: {
+    tagPrefix:    'fw-esp32c3-',
+    manifestPath: `${PAGES}/manifest-esp32c3.json`,
+    binsPath:     'bins/esp32c3',
+    label:        'ESP32-C3 Super Mini',
+    chip:         'ESP32-C3',
+  },
+  m5stick: {
+    tagPrefix:    'fw-m5stick-',
+    manifestPath: `${PAGES}/manifest-m5stick.json`,
+    binsPath:     'bins/m5stick',
+    label:        'M5StickC Plus',
+    chip:         'ESP32',
+  }
+};
+
+let currentHW = 'esp32c3';
+
+function selectHardware(hw) {
+  currentHW = hw;
+  document.querySelectorAll('.hw-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('btn-' + hw).classList.add('active');
+  loadVersions();
+}
+
 async function loadVersions() {
+  const sel = document.getElementById('version-select');
+  sel.innerHTML = '<option value="">Loading...</option>';
+  document.getElementById('fw-info').innerHTML = 'Loading versions...';
+
   try {
     const res  = await fetch(`https://api.github.com/repos/${REPO}/releases?per_page=50`);
     const data = await res.json();
+    const hw   = HW[currentHW];
 
-    // Filter to firmware releases only
-    const fwReleases = data.filter(r =>
-      r.tag_name.startsWith('fw-v') || r.tag_name.startsWith('v')
-    );
+    const releases = data.filter(r => r.tag_name.startsWith(hw.tagPrefix));
 
-    const sel = document.getElementById('version-select');
     sel.innerHTML = '';
+    if (releases.length === 0) {
+      sel.innerHTML = '<option value="">No releases found</option>';
+      document.getElementById('fw-info').innerHTML = `No ${hw.label} releases found yet.`;
+      return;
+    }
 
-    fwReleases.forEach((r, i) => {
+    releases.forEach((r, i) => {
       const opt  = document.createElement('option');
       opt.value  = JSON.stringify({
         tag:    r.tag_name,
@@ -175,10 +215,8 @@ async function loadVersions() {
 
     onVersionChange();
   } catch (e) {
-    document.getElementById('version-select').innerHTML =
-      '<option value="">Could not load versions</option>';
-    document.getElementById('fw-info').innerHTML =
-      'Failed to load releases. Check your connection.';
+    sel.innerHTML = '<option value="">Could not load versions</option>';
+    document.getElementById('fw-info').innerHTML = 'Failed to load releases. Check connection.';
   }
 }
 
@@ -187,43 +225,39 @@ function onVersionChange() {
   if (!sel.value) return;
 
   const { tag, latest, assets } = JSON.parse(sel.value);
-  const btn = document.getElementById('install-btn');
+  const btn  = document.getElementById('install-btn');
   const info = document.getElementById('fw-info');
+  const hw   = HW[currentHW];
 
   if (latest) {
-    // Latest version — use GitHub Pages (fast CDN)
-    btn.setAttribute('manifest', `${PAGES}/manifest.json`);
+    btn.setAttribute('manifest', hw.manifestPath);
     info.innerHTML = `<strong>${tag}</strong> &nbsp;<span class="badge badge-latest">latest</span><br>
-      Served from GitHub Pages CDN for fastest install.`;
+      ${hw.label} — served from GitHub Pages CDN.`;
   } else {
-    // Older version — build manifest on the fly pointing to GitHub Release assets
-    const manifest = buildManifest(tag, assets);
+    const manifest = buildManifest(tag, assets, hw);
     if (!manifest) {
-      info.innerHTML = `<strong>${tag}</strong> — release assets not found. Try a different version.`;
+      info.innerHTML = `<strong>${tag}</strong> — release assets not found.`;
       return;
     }
-    // Write manifest to a blob URL so esp-web-tools can fetch it
     const blob = new Blob([JSON.stringify(manifest)], { type: 'application/json' });
-    const url  = URL.createObjectURL(blob);
-    btn.setAttribute('manifest', url);
+    btn.setAttribute('manifest', URL.createObjectURL(blob));
     info.innerHTML = `<strong>${tag}</strong> &nbsp;<span class="badge badge-old">older</span><br>
-      Served from GitHub Release assets.`;
+      ${hw.label} — served from GitHub Release assets.`;
   }
 }
 
-function buildManifest(tag, assets) {
+function buildManifest(tag, assets, hw) {
   const find = name => assets.find(a => a.name === name)?.url;
   const bl = find('bootloader.bin');
   const pt = find('partitions.bin');
   const fw = find('firmware.bin');
   if (!bl || !pt || !fw) return null;
-
   return {
-    name: 'InclinoCar',
-    version: tag.replace(/^fw-v/, '').replace(/^v/, ''),
+    name: `InclinoCore ${hw.label}`,
+    version: tag.replace(hw.tagPrefix, '').replace(/^v/, ''),
     new_install_prompt_erase: true,
     builds: [{
-      chipFamily: 'ESP32-C3',
+      chipFamily: hw.chip,
       parts: [
         { path: bl, offset: 0 },
         { path: pt, offset: 32768 },
@@ -233,6 +267,7 @@ function buildManifest(tag, assets) {
   };
 }
 
+// Load on start
 loadVersions();
 </script>
 </body>

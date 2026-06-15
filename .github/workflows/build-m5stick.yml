@@ -1,0 +1,69 @@
+name: Build M5StickC Plus Firmware
+
+on:
+  push:
+    tags:
+      - 'fw-m5stick-v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-m5stick-${{ hashFiles('firmware/firmware-m5stick/platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Set version from tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/fw-m5stick-}
+          python3 scripts/set_version.py "$TAG" firmware/firmware-m5stick/platformio.ini
+          echo "Version: $TAG"
+
+      - name: Build firmware
+        run: cd firmware/firmware-m5stick && pio run
+
+      - name: Copy binaries
+        run: |
+          mkdir -p docs/bins/m5stick
+          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/bootloader.bin docs/bins/m5stick/
+          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/partitions.bin  docs/bins/m5stick/
+          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/firmware.bin    docs/bins/m5stick/
+
+      - name: Update manifest
+        run: |
+          TAG=${GITHUB_REF#refs/tags/fw-m5stick-}
+          VER=${TAG#v}
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest-m5stick.json
+
+      - name: Commit binaries
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/bins/m5stick/ docs/manifest-m5stick.json
+          git diff --staged --quiet || git commit -m "ci: m5stick ${GITHUB_REF#refs/tags/}"
+          git push origin HEAD:main --force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: InclinoCore M5StickC Plus ${{ github.ref_name }}
+          body: |
+            Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge.
+            Select **M5StickC Plus** from the hardware dropdown.
+          files: |
+            docs/bins/m5stick/bootloader.bin
+            docs/bins/m5stick/partitions.bin
+            docs/bins/m5stick/firmware.bin

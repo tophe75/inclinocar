@@ -17,12 +17,11 @@
 
 // Nordic UART Service UUIDs
 #define NUS_SERVICE_UUID  "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
-#define NUS_RX_UUID       "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"  // phone → device
-#define NUS_TX_UUID       "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"  // device → phone
+#define NUS_RX_UUID       "6E400002-B5A3-F393-E0A9-E50E24DCCA9E"
+#define NUS_TX_UUID       "6E400003-B5A3-F393-E0A9-E50E24DCCA9E"
 
-// Device nickname (user settable)
 char deviceNickname[32] = "InclinoCore";
-char bleAdvName[32]    = "InclinoCore";  // BLE advertising name — Core#MAC, never changes
+char bleAdvName[32]     = "InclinoCore";
 uint16_t devicePIN = 0;
 
 void generateBleAdvName() {
@@ -33,7 +32,6 @@ void generateBleAdvName() {
 }
 
 uint16_t generatePIN() {
-  // Deterministic PIN from MAC — same device always same PIN
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   return (mac[4] * 256 + mac[5]) % 9000 + 1000;
@@ -43,27 +41,23 @@ Adafruit_SSD1306 display(128, 64, &Wire, -1);
 Adafruit_MPU6050 mpu;
 Preferences prefs;
 
-float pitchOffset    = 0.0;
-float rollOffset     = 0.0;
-float smoothedPitch  = 0.0;
-float smoothedRoll   = 0.0;
-const float ALPHA    = 0.15f;  // lower = smoother, higher = more responsive
+float pitchOffset   = 0.0;
+float rollOffset    = 0.0;
+float smoothedPitch = 0.0;
+float smoothedRoll  = 0.0;
+const float ALPHA   = 0.15f;
 
-// Brightness levels: 25%, 50%, 75%, 100%
 const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
-const int     BRIGHTNESS_COUNT     = 4;
-int           brightnessIndex      = 0;  // default 25%
+const int     BRIGHTNESS_COUNT    = 4;
+int           brightnessIndex     = 0;
 
-// Brightness levels 0-3 → 64, 128, 192, 255
+bool          btnWasPressed   = false;
+unsigned long btnPressTime    = 0;
+bool          calibratePending = false;
+bool          pinVerified      = false;
 
-bool          btnWasPressed    = false;
-unsigned long btnPressTime      = 0;
-bool          calibratePending  = false;
-bool          pinVerified       = false;
-
-// BLE
-NimBLEServer*         pServer  = nullptr;
-NimBLECharacteristic* pTxChar  = nullptr;
+NimBLEServer*         pServer = nullptr;
+NimBLECharacteristic* pTxChar = nullptr;
 bool bleConnected = false;
 
 class ServerCallbacks : public NimBLEServerCallbacks {
@@ -79,7 +73,7 @@ class ServerCallbacks : public NimBLEServerCallbacks {
   }
 };
 
-void saveNickname();  // forward declaration
+void saveNickname();
 
 class RxCallbacks : public NimBLECharacteristicCallbacks {
   void onWrite(NimBLECharacteristic* c) override {
@@ -88,7 +82,6 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
     cmd.trim();
     Serial.printf("BLE RX: %s\n", cmd.c_str());
     if (cmd.startsWith("KNOWNMAC:")) {
-      // Known device reconnecting — skip PIN
       pinVerified = true;
       Serial.println("BLE: known device reconnected");
       if (pTxChar) {
@@ -101,7 +94,6 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
       if (entered == devicePIN) {
         pinVerified = true;
         Serial.println("BLE: PIN verified");
-        // Send confirmation
         if (pTxChar) {
           String ack = String("{\"pin\":\"ok\",\"n\":\"") + deviceNickname + "\"}\n";
           pTxChar->setValue((uint8_t*)ack.c_str(), ack.length());
@@ -117,7 +109,6 @@ class RxCallbacks : public NimBLECharacteristicCallbacks {
       }
     } else if (cmd == "CAL") {
       if (pinVerified) calibratePending = true;
-      Serial.println("BLE: calibration requested");
     } else if (cmd.startsWith("NICK:")) {
       String nick = cmd.substring(5);
       nick.trim();
@@ -134,24 +125,13 @@ void setupBLE() {
   NimBLEDevice::init(bleAdvName);
   pServer = NimBLEDevice::createServer();
   pServer->setCallbacks(new ServerCallbacks());
-
   NimBLEService* pService = pServer->createService(NUS_SERVICE_UUID);
-
-  // TX characteristic — device sends data to phone
-  pTxChar = pService->createCharacteristic(
-    NUS_TX_UUID,
-    NIMBLE_PROPERTY::NOTIFY
-  );
-
-  // RX characteristic — phone sends commands to device
+  pTxChar = pService->createCharacteristic(NUS_TX_UUID, NIMBLE_PROPERTY::NOTIFY);
   auto* pRxChar = pService->createCharacteristic(
     NUS_RX_UUID,
-    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR
-  );
+    NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   pRxChar->setCallbacks(new RxCallbacks());
-
   pService->start();
-
   NimBLEAdvertising* pAdv = NimBLEDevice::getAdvertising();
   pAdv->addServiceUUID(NUS_SERVICE_UUID);
   pAdv->setScanResponse(true);
@@ -169,8 +149,6 @@ void saveNickname() {
   prefs.begin("inclinocar", false);
   prefs.putString("nickname", deviceNickname);
   prefs.end();
-  // Update BLE advertising name and restart advertising
-  // BLE advertising name stays as bleAdvName — nickname is display only
 }
 
 void loadNickname() {
@@ -188,7 +166,6 @@ void saveOffsets() {
   prefs.end();
 }
 
-
 void applyBrightness() {
   display.ssd1306_command(SSD1306_SETCONTRAST);
   display.ssd1306_command(BRIGHTNESS_LEVELS[brightnessIndex]);
@@ -196,7 +173,7 @@ void applyBrightness() {
 
 void loadBrightness() {
   prefs.begin("inclinocar", true);
-  brightnessIndex = prefs.getInt("brightness", 0);  // default 25%
+  brightnessIndex = prefs.getInt("brightness", 0);
   prefs.end();
   Serial.printf("Brightness loaded: index=%d val=%d\n", brightnessIndex, BRIGHTNESS_LEVELS[brightnessIndex]);
 }
@@ -205,29 +182,9 @@ void loadOffsets() {
   prefs.begin("inclinocar", true);
   pitchOffset     = prefs.getFloat("pitchOff", 0.0);
   rollOffset      = prefs.getFloat("rollOff",  0.0);
-  brightnessIndex = prefs.getInt("brightness", 0);  // default 25%
+  brightnessIndex = prefs.getInt("brightness", 0);
   prefs.end();
   Serial.printf("Offsets loaded: pitch=%.2f roll=%.2f brightness=%d\n", pitchOffset, rollOffset, brightnessIndex);
-}
-
-
-void cycleBrightness() {
-  brightnessIndex = (brightnessIndex + 1) % BRIGHTNESS_COUNT;
-  applyBrightness();
-  saveBrightness();
-
-  // Brief feedback on screen
-  display.clearDisplay();
-  display.setTextColor(SSD1306_WHITE);
-  display.setTextSize(1);
-  display.setCursor(0, 20);
-  display.println("  Brightness:");
-  display.setTextSize(2);
-  display.setCursor(20, 36);
-  int pct = (BRIGHTNESS_LEVELS[brightnessIndex] * 100) / 255;
-  display.printf("  %d%%", pct);
-  display.display();
-  delay(800);
 }
 
 void calibrate() {
@@ -238,7 +195,6 @@ void calibrate() {
   display.setCursor(0, 16); display.println("  Keep still!");
   display.display();
   delay(500);
-
   float pSum = 0, rSum = 0;
   for (int i = 0; i < 50; i++) {
     sensors_event_t a, g, t;
@@ -247,15 +203,13 @@ void calibrate() {
                   sqrt(a.acceleration.y*a.acceleration.y +
                        a.acceleration.z*a.acceleration.z)) * 180.0/PI;
     float rr = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
-    // Apply same CW 90 rotation
-    pSum +=  rr;
-    rSum +=  rp;
+    pSum += rr;
+    rSum += rp;
     delay(20);
   }
   pitchOffset = pSum / 50.0;
   rollOffset  = rSum / 50.0;
   saveOffsets();
-
   display.clearDisplay();
   display.setCursor(0, 0);  display.println("  Cal saved!");
   display.setCursor(0, 16); display.printf("  P: %.1f\n", pitchOffset);
@@ -264,36 +218,32 @@ void calibrate() {
   delay(5000);
 }
 
-void showBrightnessMsg() {
+void cycleBrightness() {
+  brightnessIndex = (brightnessIndex + 1) % BRIGHTNESS_COUNT;
+  applyBrightness();
+  saveBrightness();
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
   display.setCursor(0, 20); display.println("  Brightness:");
   display.setTextSize(2);
-  int pct = (brightnessIndex + 1) * 25;
-  display.setCursor(32, 36); display.printf("%d%%", pct);
+  display.setCursor(20, 36);
+  int pct = (BRIGHTNESS_LEVELS[brightnessIndex] * 100) / 255;
+  display.printf("  %d%%", pct);
   display.display();
-  delay(600);
+  delay(800);
 }
 
 void handleButton() {
   bool pressed = (digitalRead(BTN_PIN) == LOW);
-
   if (pressed && !btnWasPressed) {
     btnPressTime  = millis();
     btnWasPressed = true;
   }
-
-  // Released before hold threshold — single press → brightness
   if (!pressed && btnWasPressed) {
     btnWasPressed = false;
-    unsigned long held = millis() - btnPressTime;
-    if (held < CAL_HOLD_MS) {
-      cycleBrightness();
-    }
+    if (millis() - btnPressTime < CAL_HOLD_MS) cycleBrightness();
   }
-
-  // Still held past threshold → calibrate
   if (pressed && btnWasPressed && millis() - btnPressTime >= CAL_HOLD_MS) {
     btnWasPressed = false;
     calibrate();
@@ -303,21 +253,17 @@ void handleButton() {
 void setup() {
   Serial.begin(115200);
   pinMode(BTN_PIN, INPUT_PULLUP);
-
   Wire.begin(SDA_PIN, SCL_PIN);
-
   if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
     Serial.println("OLED failed"); while(1);
   }
-
   display.clearDisplay();
   display.setTextColor(SSD1306_WHITE);
   display.setTextSize(1);
-  display.setCursor(0, 0);  display.println(deviceNickname);
+  display.setCursor(0, 0);  display.println("InclinoCore");
   display.setCursor(0, 12); display.println("  " FW_VERSION);
   display.setCursor(0, 28); display.println("  Starting...");
   display.display();
-
   if (!mpu.begin()) {
     display.setCursor(0, 44); display.println("  IMU not found!");
     display.display();
@@ -325,7 +271,6 @@ void setup() {
   }
   mpu.setAccelerometerRange(MPU6050_RANGE_8_G);
   mpu.setFilterBandwidth(MPU6050_BAND_21_HZ);
-
   loadOffsets();
   loadNickname();
   loadBrightness();
@@ -334,9 +279,7 @@ void setup() {
   Serial.printf("Device PIN: %04d\n", devicePIN);
   applyBrightness();
   setupBLE();
-
   display.clearDisplay();
-  // Show MAC and PIN on boot screen
   uint8_t mac[6];
   esp_read_mac(mac, ESP_MAC_WIFI_STA);
   char macStr[18];
@@ -354,68 +297,45 @@ void setup() {
 
 void loop() {
   handleButton();
-
-  if (calibratePending) {
-    calibratePending = false;
-    calibrate();
-  }
-
+  if (calibratePending) { calibratePending = false; calibrate(); }
   sensors_event_t a, g, temp;
   mpu.getEvent(&a, &g, &temp);
-
-  // Raw axis values (no offset yet)
   float rawPitch = atan2(-a.acceleration.x,
                    sqrt(a.acceleration.y*a.acceleration.y +
                         a.acceleration.z*a.acceleration.z)) * 180.0/PI;
   float rawRoll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
-
-  // Rotate axes CW 90 degrees then apply calibration offsets
-  float rotPitch =  rawRoll  - pitchOffset;
-  float rotRoll  =  rawPitch - rollOffset;
-
-  // Exponential moving average to reduce jitter
+  float rotPitch = rawRoll  - pitchOffset;
+  float rotRoll  = rawPitch - rollOffset;
   smoothedPitch = ALPHA * rotPitch + (1.0f - ALPHA) * smoothedPitch;
   smoothedRoll  = ALPHA * rotRoll  + (1.0f - ALPHA) * smoothedRoll;
-
   float pitch = smoothedPitch;
   float roll  = smoothedRoll;
-
-  // Send JSON over BLE NUS — only after PIN verified
   if (bleConnected && pinVerified) {
     char buf[96];
     snprintf(buf, sizeof(buf), "{\"p\":%.1f,\"r\":%.1f,\"n\":\"%s\"}\n", pitch, roll, deviceNickname);
     pTxChar->setValue((uint8_t*)buf, strlen(buf));
     pTxChar->notify();
   }
-
   Serial.printf("P:%+6.1f  R:%+6.1f  BLE:%s\n", pitch, roll, bleConnected ? "connected" : "advertising");
-
-  // Update display
   display.clearDisplay();
   display.setTextSize(1);
   display.setTextColor(SSD1306_WHITE);
-  // Left: "InclinoCar vX.X.X"  Right: "BT+" — drawn separately so they never overlap
   display.setCursor(0, 0);
   display.print(deviceNickname);
   display.drawLine(0, 10, 127, 10, SSD1306_WHITE);
-
   display.setTextSize(2);
   display.setCursor(0, 16);
   display.printf("P%6.1f", pitch);
   display.setTextSize(1); display.print((char)247);
-
   display.setTextSize(2);
   display.setCursor(0, 38);
   display.printf("R%6.1f", roll);
   display.setTextSize(1); display.print((char)247);
-
   display.drawLine(0, 54, 127, 54, SSD1306_WHITE);
   display.setCursor(0, 57);
   display.setTextSize(1);
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
   display.print(level ? "  ** LEVEL **" : "  Adjust...");
-
-  // Show PIN when not connected so user can always find it
   if (bleConnected && pinVerified) {
     display.setCursor(116, 0);
     display.print("BT");
@@ -423,7 +343,6 @@ void loop() {
     display.setCursor(68, 0);
     display.printf("PIN:%04d", devicePIN);
   }
-
   display.display();
   delay(100);
 }

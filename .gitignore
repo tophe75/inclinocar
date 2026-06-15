@@ -1,15 +1,11 @@
 # PlatformIO build output
-firmware/.pio/
-firmware-satellite/.pio/
+firmware/firmware-esp32c3/.pio/
+firmware/firmware-m5stick/.pio/
 
 # VS Code
 .vscode/
-firmware/.vscode/
-firmware-satellite/.vscode/
-
-# Old firmware folders (from previous project structure)
-firmware/core/
-firmware/satellite/
+firmware/firmware-esp32c3/.vscode/
+firmware/firmware-m5stick/.vscode/
 
 # OS
 .DS_Store

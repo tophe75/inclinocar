@@ -1,0 +1,13 @@
+{
+  "name": "InclinoCore M5StickC Plus",
+  "version": "0.0.1",
+  "new_install_prompt_erase": true,
+  "builds": [{
+    "chipFamily": "ESP32",
+    "parts": [
+      { "path": "bins/m5stick/bootloader.bin", "offset": 0 },
+      { "path": "bins/m5stick/partitions.bin",  "offset": 32768 },
+      { "path": "bins/m5stick/firmware.bin",    "offset": 65536 }
+    ]
+  }]
+}
