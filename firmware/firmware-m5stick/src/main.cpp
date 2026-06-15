@@ -171,68 +171,60 @@ void saveBrightness() {
 }
 
 void drawMainScreen(float pitch, float roll) {
-  // Landscape 240w x 135h — all horizontal rows
+  // 240w x 135h landscape
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
   M5.Display.fillScreen(C_BG);
 
-  // Row 1: nickname + BT/PIN  y=2
+  // ── Top bar: nickname left, PIN/BT right ──
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(C_GREEN, C_BG);
-  M5.Display.setCursor(4, 2);
+  M5.Display.setCursor(4, 4);
   M5.Display.print(deviceNickname);
+
   if (bleConnected && pinVerified) {
     M5.Display.setTextColor(C_GREEN, C_BG);
-    M5.Display.setCursor(216, 2);
+    M5.Display.setCursor(216, 4);
     M5.Display.print("BT");
   } else {
     M5.Display.setTextColor(C_DIM, C_BG);
-    M5.Display.setCursor(192, 2);
     char pinStr[10];
     snprintf(pinStr, sizeof(pinStr), "%04d", devicePIN);
+    M5.Display.setCursor(192, 4);
     M5.Display.print(pinStr);
   }
 
-  M5.Display.drawLine(0, 13, 240, 13, C_DIM);
-
-  // Row 2: PITCH label + value  y=16 / y=26
+  // ── PITCH — label small, value big ──
   uint16_t pc = abs(pitch) < 1.0 ? C_GREEN : (abs(pitch) < 3.0 ? C_AMBER : C_RED);
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setTextSize(1);
-  M5.Display.setCursor(4, 16);
+  M5.Display.setCursor(4, 20);
   M5.Display.print("PITCH");
   M5.Display.setTextColor(pc, C_BG);
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(4);
   char buf[12];
   snprintf(buf, sizeof(buf), "%+.1f", pitch);
-  M5.Display.setCursor(4, 27);
+  M5.Display.setCursor(4, 32);
   M5.Display.print(buf);
 
-  M5.Display.drawLine(0, 50, 240, 50, C_DIM);
-
-  // Row 3: ROLL label + value  y=53 / y=63
+  // ── ROLL — label small, value big ──
   uint16_t rc = abs(roll) < 1.0 ? C_GREEN : (abs(roll) < 3.0 ? C_AMBER : C_RED);
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setTextSize(1);
-  M5.Display.setCursor(4, 53);
+  M5.Display.setCursor(4, 78);
   M5.Display.print("ROLL");
   M5.Display.setTextColor(rc, C_BG);
-  M5.Display.setTextSize(2);
+  M5.Display.setTextSize(4);
   snprintf(buf, sizeof(buf), "%+.1f", roll);
-  M5.Display.setCursor(4, 64);
+  M5.Display.setCursor(4, 90);
   M5.Display.print(buf);
 
-  M5.Display.drawLine(0, 87, 240, 87, C_DIM);
-
-  // Row 4: status centred  y=95
-  M5.Display.setTextSize(2);
-  M5.Display.setTextColor(level ? C_GREEN : C_AMBER, C_BG);
-  const char* st = level ? "** LEVEL **" : "Adjust...";
-  int sx = (240 - (int)strlen(st) * 12) / 2;
-  M5.Display.setCursor(sx, 98);
-  M5.Display.print(st);
-
-  // Version bottom left  y=126
+  // ── Status bottom right ──
   M5.Display.setTextSize(1);
+  M5.Display.setTextColor(level ? C_GREEN : C_AMBER, C_BG);
+  M5.Display.setCursor(level ? 160 : 172, 126);
+  M5.Display.print(level ? "** LEVEL **" : "Adjust...");
+
+  // ── Version bottom left ──
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setCursor(4, 126);
   M5.Display.print(FW_VERSION);
