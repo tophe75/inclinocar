@@ -41,7 +41,8 @@ float pitchOffset   = 0.0;
 float rollOffset    = 0.0;
 float smoothedPitch = 0.0;
 float smoothedRoll  = 0.0;
-const float ALPHA   = 0.15f;
+const float ALPHA_P = 0.05f;  // pitch is stable
+const float ALPHA_R = 0.02f;  // roll needs more smoothing
 
 const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int     BRIGHTNESS_COUNT    = 4;
@@ -56,7 +57,6 @@ NimBLEServer*         pServer = nullptr;
 NimBLECharacteristic* pTxChar = nullptr;
 bool bleConnected = false;
 
-// ── BLE ─────────────────────────────────────────────────────
 class ServerCallbacks : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* s) override {
     bleConnected = true;
@@ -132,7 +132,6 @@ void setupBLE() {
   Serial.printf("BLE advertising as '%s'\n", bleAdvName);
 }
 
-// ── NVS ─────────────────────────────────────────────────────
 void saveNickname() {
   prefs.begin("inclinocar", false);
   prefs.putString("nickname", deviceNickname);
@@ -171,81 +170,82 @@ void saveBrightness() {
   prefs.end();
 }
 
-// ── Display ──────────────────────────────────────────────────
 void drawMainScreen(float pitch, float roll) {
+  // Landscape 240w x 135h — all horizontal rows
   bool level = abs(pitch) < 1.0 && abs(roll) < 1.0;
-
   M5.Display.fillScreen(C_BG);
 
-  // Header
+  // Row 1: nickname + BT/PIN  y=2
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(C_GREEN, C_BG);
-  M5.Display.setCursor(4, 4);
+  M5.Display.setCursor(4, 2);
   M5.Display.print(deviceNickname);
-
   if (bleConnected && pinVerified) {
-    M5.Display.setCursor(106, 4);
+    M5.Display.setTextColor(C_GREEN, C_BG);
+    M5.Display.setCursor(216, 2);
     M5.Display.print("BT");
-  } else if (!bleConnected) {
+  } else {
     M5.Display.setTextColor(C_DIM, C_BG);
-    M5.Display.setCursor(74, 4);
+    M5.Display.setCursor(192, 2);
     char pinStr[10];
     snprintf(pinStr, sizeof(pinStr), "%04d", devicePIN);
     M5.Display.print(pinStr);
   }
 
-  M5.Display.drawLine(0, 18, 135, 18, C_DIM);
+  M5.Display.drawLine(0, 13, 240, 13, C_DIM);
 
-  // Pitch
+  // Row 2: PITCH label + value  y=16 / y=26
   uint16_t pc = abs(pitch) < 1.0 ? C_GREEN : (abs(pitch) < 3.0 ? C_AMBER : C_RED);
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setTextSize(1);
-  M5.Display.setCursor(4, 26);
+  M5.Display.setCursor(4, 16);
   M5.Display.print("PITCH");
   M5.Display.setTextColor(pc, C_BG);
-  M5.Display.setTextSize(3);
-  M5.Display.setCursor(4, 40);
+  M5.Display.setTextSize(2);
   char buf[12];
   snprintf(buf, sizeof(buf), "%+.1f", pitch);
+  M5.Display.setCursor(4, 27);
   M5.Display.print(buf);
 
-  M5.Display.drawLine(0, 100, 135, 100, C_DIM);
+  M5.Display.drawLine(0, 50, 240, 50, C_DIM);
 
-  // Roll
+  // Row 3: ROLL label + value  y=53 / y=63
   uint16_t rc = abs(roll) < 1.0 ? C_GREEN : (abs(roll) < 3.0 ? C_AMBER : C_RED);
   M5.Display.setTextColor(C_DIM, C_BG);
   M5.Display.setTextSize(1);
-  M5.Display.setCursor(4, 108);
+  M5.Display.setCursor(4, 53);
   M5.Display.print("ROLL");
   M5.Display.setTextColor(rc, C_BG);
-  M5.Display.setTextSize(3);
-  M5.Display.setCursor(4, 122);
+  M5.Display.setTextSize(2);
   snprintf(buf, sizeof(buf), "%+.1f", roll);
+  M5.Display.setCursor(4, 64);
   M5.Display.print(buf);
 
-  M5.Display.drawLine(0, 182, 135, 182, C_DIM);
+  M5.Display.drawLine(0, 87, 240, 87, C_DIM);
 
-  // Status
+  // Row 4: status centred  y=95
   M5.Display.setTextSize(2);
   M5.Display.setTextColor(level ? C_GREEN : C_AMBER, C_BG);
-  M5.Display.setCursor(4, 192);
-  M5.Display.print(level ? "** LEVEL **" : "Adjust...");
+  const char* st = level ? "** LEVEL **" : "Adjust...";
+  int sx = (240 - (int)strlen(st) * 12) / 2;
+  M5.Display.setCursor(sx, 98);
+  M5.Display.print(st);
 
-  // Version
+  // Version bottom left  y=126
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(C_DIM, C_BG);
-  M5.Display.setCursor(4, 226);
+  M5.Display.setCursor(4, 126);
   M5.Display.print(FW_VERSION);
 }
 
-// ── Calibration ──────────────────────────────────────────────
+
 void calibrate() {
   M5.Display.fillScreen(C_BG);
   M5.Display.setTextColor(C_AMBER, C_BG);
   M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 80);
+  M5.Display.setCursor(4, 40);
   M5.Display.print("Calibrating");
-  M5.Display.setCursor(4, 106);
+  M5.Display.setCursor(4, 70);
   M5.Display.print("Keep still!");
   delay(500);
 
@@ -255,8 +255,8 @@ void calibrate() {
     M5.Imu.getAccelData(&ax, &ay, &az);
     float rp = atan2(-ax, sqrt(ay*ay + az*az)) * 180.0/PI;
     float rr = atan2(ay, az) * 180.0/PI;
-    pSum += rr;
-    rSum += rp;
+    pSum += rp;
+    rSum += rr + 90.0f;  // bake 90deg into saved offset
     delay(20);
   }
   pitchOffset = pSum / 50.0;
@@ -266,13 +266,13 @@ void calibrate() {
   M5.Display.fillScreen(C_BG);
   M5.Display.setTextColor(C_GREEN, C_BG);
   M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 80);
+  M5.Display.setCursor(4, 30);
   M5.Display.print("Cal saved!");
   char buf[20];
   snprintf(buf, sizeof(buf), "P: %.1f", pitchOffset);
-  M5.Display.setCursor(4, 110); M5.Display.print(buf);
+  M5.Display.setCursor(4, 60); M5.Display.print(buf);
   snprintf(buf, sizeof(buf), "R: %.1f", rollOffset);
-  M5.Display.setCursor(4, 134); M5.Display.print(buf);
+  M5.Display.setCursor(4, 90); M5.Display.print(buf);
   delay(3000);
 }
 
@@ -283,20 +283,20 @@ void cycleBrightness() {
   M5.Display.fillScreen(C_BG);
   M5.Display.setTextColor(C_GREEN, C_BG);
   M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 90);
+  M5.Display.setCursor(4, 30);
   M5.Display.print("Brightness");
   int pct = (brightnessIndex + 1) * 25;
   char buf[8];
   snprintf(buf, sizeof(buf), "%d%%", pct);
   M5.Display.setTextSize(4);
-  M5.Display.setCursor(30, 120);
+  M5.Display.setCursor(60, 60);
   M5.Display.print(buf);
   delay(800);
 }
 
 void handleButton() {
   M5.update();
-  bool pressed = M5.BtnA.isPressed();
+  bool pressed = M5.BtnB.isPressed();
   if (pressed && !btnWasPressed) {
     btnPressTime  = millis();
     btnWasPressed = true;
@@ -311,29 +311,25 @@ void handleButton() {
   }
 }
 
-// ── Setup ────────────────────────────────────────────────────
 void setup() {
-  auto cfg = M5.config();
-  M5.begin(cfg);
-
+  M5.begin();
   Serial.begin(115200);
-  Serial.println("InclinoCore M5StickC Plus starting...");
+  Serial.println("InclinoCore M5 starting...");
 
-  M5.Display.setRotation(0);  // Portrait 135x240
+  M5.Display.setRotation(1);
   M5.Display.fillScreen(C_BG);
   M5.Display.setTextColor(C_GREEN, C_BG);
   M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 80);
+  M5.Display.setCursor(4, 40);
   M5.Display.print("InclinoCore");
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(C_DIM, C_BG);
-  M5.Display.setCursor(4, 108);
+  M5.Display.setCursor(4, 70);
   M5.Display.print(FW_VERSION);
-  M5.Display.setCursor(4, 124);
+  M5.Display.setCursor(4, 86);
   M5.Display.print("Starting...");
 
   M5.Imu.init();
-
   loadOffsets();
   loadNickname();
   generateBleAdvName();
@@ -351,30 +347,28 @@ void setup() {
   M5.Display.fillScreen(C_BG);
   M5.Display.setTextColor(C_GREEN, C_BG);
   M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 20);
+  M5.Display.setCursor(4, 4);
   M5.Display.print(deviceNickname);
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(C_DIM, C_BG);
-  M5.Display.setCursor(4, 54);
+  M5.Display.setCursor(4, 28);
   M5.Display.print(FW_VERSION);
-  M5.Display.setCursor(4, 70);
+  M5.Display.setCursor(4, 44);
   M5.Display.print(macStr);
   M5.Display.setTextColor(C_WHITE, C_BG);
   M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 100);
+  M5.Display.setCursor(4, 68);
   char pinStr[14];
   snprintf(pinStr, sizeof(pinStr), "PIN: %04d", devicePIN);
   M5.Display.print(pinStr);
   M5.Display.setTextSize(1);
   M5.Display.setTextColor(C_DIM, C_BG);
-  M5.Display.setCursor(4, 140);
+  M5.Display.setCursor(4, 108);
   M5.Display.print((pitchOffset != 0.0 || rollOffset != 0.0) ?
-    "Cal loaded" : "Hold BtnA: calibrate");
-
+    "Cal loaded" : "Hold BtnB: cal");
   delay(5000);
 }
 
-// ── Loop ─────────────────────────────────────────────────────
 void loop() {
   handleButton();
   if (calibratePending) { calibratePending = false; calibrate(); }
@@ -384,13 +378,14 @@ void loop() {
 
   float rawPitch = atan2(-ax, sqrt(ay*ay + az*az)) * 180.0/PI;
   float rawRoll  = atan2(ay, az) * 180.0/PI;
-  float rotPitch = rawRoll  - pitchOffset;
-  float rotRoll  = rawPitch - rollOffset;
-  smoothedPitch  = ALPHA * rotPitch + (1.0f - ALPHA) * smoothedPitch;
-  smoothedRoll   = ALPHA * rotRoll  + (1.0f - ALPHA) * smoothedRoll;
+  // Remap axes for display-face-left mounting orientation
+  float rotPitch = rawPitch - pitchOffset;
+  float rotRoll  = rawRoll  - rollOffset;
+  smoothedPitch  = ALPHA_P * rotPitch + (1.0f - ALPHA_P) * smoothedPitch;
+  smoothedRoll   = ALPHA_R * rotRoll  + (1.0f - ALPHA_R) * smoothedRoll;
 
   float pitch = smoothedPitch;
-  float roll  = smoothedRoll;
+  float roll  = smoothedRoll + 90.0f;  // correct for side-mount orientation
 
   if (bleConnected && pinVerified) {
     char buf[96];
