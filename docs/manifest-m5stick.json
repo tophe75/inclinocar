@@ -1,6 +1,6 @@
 {
   "name": "InclinoCore M5StickC Plus",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "new_install_prompt_erase": true,
   "builds": [{
     "chipFamily": "ESP32",
