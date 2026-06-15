@@ -43,9 +43,19 @@ Preferences prefs;
 
 float pitchOffset   = 0.0;
 float rollOffset    = 0.0;
-float smoothedPitch = 0.0;
-float smoothedRoll  = 0.0;
-const float ALPHA   = 0.15f;
+#define MF_SIZE 7
+float pitchBuf[MF_SIZE] = {0};
+float rollBuf[MF_SIZE]  = {0};
+int   mfIndex = 0;
+
+float medianOf7(float* buf) {
+  float tmp[MF_SIZE];
+  memcpy(tmp, buf, sizeof(tmp));
+  for (int i = 0; i < MF_SIZE-1; i++)
+    for (int j = i+1; j < MF_SIZE; j++)
+      if (tmp[j] < tmp[i]) { float t=tmp[i]; tmp[i]=tmp[j]; tmp[j]=t; }
+  return tmp[MF_SIZE/2];
+}
 
 const uint8_t BRIGHTNESS_LEVELS[] = {64, 128, 192, 255};
 const int     BRIGHTNESS_COUNT    = 4;
@@ -202,7 +212,7 @@ void calibrate() {
     float rp = atan2(-a.acceleration.x,
                   sqrt(a.acceleration.y*a.acceleration.y +
                        a.acceleration.z*a.acceleration.z)) * 180.0/PI;
-    float rr = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
+    float rr = -atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
     pSum += rr;
     rSum += rp;
     delay(20);
@@ -303,13 +313,14 @@ void loop() {
   float rawPitch = atan2(-a.acceleration.x,
                    sqrt(a.acceleration.y*a.acceleration.y +
                         a.acceleration.z*a.acceleration.z)) * 180.0/PI;
-  float rawRoll  = atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
-  float rotPitch = rawRoll  - pitchOffset;
-  float rotRoll  = rawPitch - rollOffset;
-  smoothedPitch = ALPHA * rotPitch + (1.0f - ALPHA) * smoothedPitch;
-  smoothedRoll  = ALPHA * rotRoll  + (1.0f - ALPHA) * smoothedRoll;
-  float pitch = smoothedPitch;
-  float roll  = smoothedRoll;
+  float rawRoll  = -atan2(a.acceleration.y, a.acceleration.z) * 180.0/PI;
+  float rotPitch = -rawRoll  - pitchOffset;
+  float rotRoll  =  rawPitch - rollOffset;
+  pitchBuf[mfIndex] = rotPitch;
+  rollBuf[mfIndex]  = rotRoll;
+  mfIndex = (mfIndex + 1) % MF_SIZE;
+  float pitch = medianOf7(pitchBuf);
+  float roll  = medianOf7(rollBuf);
   if (bleConnected && pinVerified) {
     char buf[96];
     snprintf(buf, sizeof(buf), "{\"p\":%.1f,\"r\":%.1f,\"n\":\"%s\"}\n", pitch, roll, deviceNickname);
