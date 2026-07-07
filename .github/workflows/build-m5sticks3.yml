@@ -1,0 +1,71 @@
+name: Build M5StickS3 Firmware
+
+on:
+  push:
+    tags:
+      - 'fw-m5sticks3-v*'
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Cache PlatformIO
+        uses: actions/cache@v4
+        with:
+          path: ~/.platformio
+          key: pio-m5sticks3-${{ hashFiles('firmware/firmware-m5sticks3/platformio.ini') }}
+
+      - name: Install PlatformIO
+        run: pip install platformio
+
+      - name: Set version from tag
+        run: |
+          TAG=${GITHUB_REF#refs/tags/fw-m5sticks3-}
+          python3 scripts/set_version.py "$TAG" firmware/firmware-m5sticks3/platformio.ini
+          echo "Version: $TAG"
+
+      - name: Build firmware
+        run: cd firmware/firmware-m5sticks3 && pio run
+
+      - name: Copy binaries
+        run: |
+          mkdir -p docs/bins/m5sticks3
+          cp firmware/firmware-m5sticks3/.pio/build/m5stack-sticks3/bootloader.bin docs/bins/m5sticks3/
+          cp firmware/firmware-m5sticks3/.pio/build/m5stack-sticks3/partitions.bin  docs/bins/m5sticks3/
+          cp firmware/firmware-m5sticks3/.pio/build/m5stack-sticks3/firmware.bin    docs/bins/m5sticks3/
+          # boot_app0.bin required for ESP32-S3 OTA boot
+          find ~/.platformio -name "boot_app0.bin" | head -1 | xargs -I{} cp {} docs/bins/m5sticks3/
+
+      - name: Update manifest
+        run: |
+          TAG=${GITHUB_REF#refs/tags/fw-m5sticks3-}
+          VER=${TAG#v}
+          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest-m5sticks3.json
+
+      - name: Commit binaries
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/bins/m5sticks3/ docs/manifest-m5sticks3.json
+          git diff --staged --quiet || git commit -m "ci: m5sticks3 ${GITHUB_REF#refs/tags/}"
+          git push origin HEAD:main --force
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: InclinoCore M5StickS3 ${{ github.ref_name }}
+          body: |
+            Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge.
+            Select **M5StickS3** from the hardware dropdown.
+          files: |
+            docs/bins/m5sticks3/bootloader.bin
+            docs/bins/m5sticks3/partitions.bin
+            docs/bins/m5sticks3/firmware.bin

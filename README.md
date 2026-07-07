@@ -19,6 +19,7 @@ Requires Chrome or Edge on desktop.
 🔧 **Firmware:**
 - ESP32-C3 Super Mini ![ESP32-C3](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-esp32c3-*&label=ESP32-C3&color=blue&logo=espressif)
 - M5StickC Plus ![M5StickC](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-m5stick-*&label=M5StickC%20Plus&color=blue&logo=espressif)
+- M5StickS3 ![M5StickS3](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=fw-m5sticks3-*&label=M5StickS3&color=blue&logo=espressif)
 
 🤖 **Android:** ![Android](https://img.shields.io/github/v/release/tophe75/inclinocar?filter=android-*&label=Android&color=green&logo=android)
 
@@ -28,7 +29,9 @@ Requires Chrome or Edge on desktop.
 
 ## Hardware
 
-### What You Need
+InclinoCar runs on three hardware targets. The ESP32-C3 is the DIY option; the two M5Stack sticks are all-in-one units with built-in display, IMU, and battery.
+
+### Option 1 — ESP32-C3 Super Mini (DIY)
 
 - [ESP32-C3 Super Mini](https://www.amazon.com/DWEII-ESP32-C3-Development-Supermini-Bluetooth/dp/B0G5XS345R)
 - [SSD1306 OLED display 128×64 (I2C)](https://www.amazon.com/UCTRONICS-SSD1306-Self-Luminous-Display-Raspberry/dp/B072Q2X2LL)
@@ -36,10 +39,21 @@ Requires Chrome or Edge on desktop.
 - [Momentary push button](https://www.amazon.com/Gebildet-Momentary-Button-Switch-Railway/dp/B07YDHP3HS)
 - [Jumper wires (26 AWG Silicone)](https://www.amazon.com/Fermerry-Stranded-Colors-Flexible-electrical/dp/B089D3T1JD)
 
-If you have a [M5StickCPlus](https://shop.m5stack.com/products/m5stickc-plus-esp32-pico-mini-iot-development-kit) there is a version, however I don't like the drift and inconsistency of the device
+### Option 2 — M5StickC Plus
 
+All-in-one unit with built-in MPU6886 IMU, colour display and battery. No wiring needed. The MPU6886 can drift and is a little noisy — acceptable for leveling but not the best of the three.
 
-### Wiring
+[M5StickC Plus](https://shop.m5stack.com/products/m5stickc-plus-esp32-pico-mini-iot-development-kit)
+
+### Option 3 — M5StickS3 (recommended all-in-one)
+
+All-in-one unit with the newer BMI270 IMU — noticeably more stable than the MPU6886 — plus a larger 250mAh battery.
+
+[M5StickS3](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit)
+
+> ℹ️ The M5StickS3 (ESP32-S3) may reset repeatedly when plugged into a PC **without** a serial terminal open. This is an ESP32-S3 USB-JTAG hardware behaviour and cannot be disabled in firmware on this chip. It does not affect normal use — the device runs fine on its battery, a USB charger, a power bank, or a car USB port.
+
+### Wiring (ESP32-C3 only)
 
 All devices share the same I2C bus on GPIO6 and GPIO7.
 
@@ -66,15 +80,20 @@ GND       →       Terminal 2
 (internal pull-up — no resistor needed)
 ```
 
+The M5StickC Plus and M5StickS3 need no wiring — display, IMU, button and battery are all built in.
+
 ---
 
 ## Installation
 
 1. Open the [Web Installer](https://tophe75.github.io/inclinocar/) in Chrome or Edge
-2. Select the firmware version
-3. Click **Install**
-4. Select **Erase device** when prompted — required for first install
-5. Device reboots automatically when done
+2. Select your hardware (ESP32-C3, M5StickC Plus, or M5StickS3)
+3. Select the firmware version
+4. Click **Install**
+5. Select **Erase device** when prompted — required for first install
+6. Device reboots automatically when done
+
+For the M5 sticks, hold the power button ~2 seconds to enter download mode if the installer can't connect.
 
 ---
 
@@ -86,7 +105,7 @@ On power-up the device shows the device nickname, firmware version, MAC address 
 
 ```
   InclinoCore
-  v0.0.31
+  v0.0.4
   E8:3D:C1:9E:43:38
   PIN: 9208
   Cal loaded
@@ -103,7 +122,7 @@ On power-up the device shows the device nickname, firmware version, MAC address 
   Adjust...            ← or ** LEVEL ** when within 1°
 ```
 
-`BT` appears in the top right when the app is connected.
+`BT` appears in the top right when the app is connected. The M5 sticks also show battery percentage.
 
 ### Button
 
@@ -111,6 +130,10 @@ On power-up the device shows the device nickname, firmware version, MAC address 
 |--------|----------|
 | Short press | Cycle display brightness (25% → 50% → 75% → 100% → 25%) |
 | Hold 1 second | Calibrate (keep device still on flat ground) |
+
+- ESP32-C3: the wired push button
+- M5StickC Plus: side button (BtnB)
+- M5StickS3: front button (BtnA)
 
 Default brightness on first boot is 25%.
 
@@ -125,8 +148,6 @@ Hold the button for 1 second with the vehicle on flat level ground. The device t
 3. Select your device from the list (identified by MAC address)
 4. Enter the 4-digit PIN shown on the device display
 5. The app remembers your device and auto-connects next time
-=======
-Short press the buttom to cycle through 25%, 50%, 75% and 100% (default start value is 25%).
 
 The PIN is unique to each device and never changes.
 
@@ -146,8 +167,10 @@ The device sends JSON over Nordic UART Service (NUS) every 100ms:
 
 | Problem | Solution |
 |---------|----------|
-| Display blank after flash | Check SDA=GPIO6, SCL=GPIO7, VCC=3.3V |
-| IMU not found | Check MPU-6050 wiring, AD0 must be GND |
+| Display blank after flash (ESP32-C3) | Check SDA=GPIO6, SCL=GPIO7, VCC=3.3V |
+| IMU not found (ESP32-C3) | Check MPU-6050 wiring, AD0 must be GND |
+| M5 stick won't flash | Hold power button ~2s to enter download mode |
+| M5StickS3 resets when plugged into PC | Normal — open a serial monitor, or just run it on battery/charger. ESP32-S3 hardware behaviour. |
 | Values drifting | Hold button 1s to calibrate |
 | App can't find device | Menu → Scan for InclinoCore, check device is powered on |
 | Wrong PIN | Check the device display — PIN is shown on boot screen and top-right when not connected |
@@ -186,22 +209,25 @@ STL files for cases and mounting brackets are in the `3d-print/` folder. Print i
 ## Project Structure
 
 ```
-firmware/           PlatformIO project (ESP32-C3 core unit)
-app/                Flutter app (Android + iOS)
-  app/lib/          Dart source code
-  app/android/      Android build files and icons
-  app/ios/          iOS build files and icons
-  app/assets/       App assets (master icon, Play Store icon)
-docs/               GitHub Pages web installer
-3d-print/           STL files for cases and mounting brackets
-scripts/            Build utilities (version injection)
-.github/workflows/  CI/CD pipelines
+firmware/
+  firmware-esp32c3/   PlatformIO project (ESP32-C3 + MPU-6050 + SSD1306)
+  firmware-m5stick/   PlatformIO project (M5StickC Plus)
+  firmware-m5sticks3/ PlatformIO project (M5StickS3)
+app/                  Flutter app (Android + iOS)
+  app/lib/            Dart source code
+  app/android/        Android build files and icons
+  app/ios/            iOS build files and icons
+  app/assets/         App assets (master icon, Play Store icon)
+docs/                 GitHub Pages web installer
+3d-print/             STL files for cases and mounting brackets
+scripts/              Build utilities (version injection)
+.github/workflows/    CI/CD pipelines
 ```
 
 ## Building Locally
 
 **Firmware** — requires [VS Code](https://code.visualstudio.com/) and [PlatformIO](https://platformio.org/install/ide?install=vscode).
-Open the `firmware/` folder in VS Code and click **Upload**.
+Open the relevant `firmware/firmware-*` folder in VS Code and click **Upload**.
 
 **App** — requires [Flutter](https://flutter.dev/docs/get-started/install) SDK.
 ```bash
