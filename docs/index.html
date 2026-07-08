@@ -40,17 +40,16 @@
     .selector-group { text-align: left; margin-bottom: 14px; }
     .selector-group label { display: block; font-size: 0.75rem; color: var(--dim); letter-spacing: 1px; text-transform: uppercase; margin-bottom: 6px; }
 
-    /* Hardware toggle buttons */
     .hw-toggle { display: flex; gap: 8px; margin-bottom: 14px; }
     .hw-btn {
       flex: 1;
-      padding: 10px;
+      padding: 10px 6px;
       background: #0a120a;
       color: var(--dim);
       border: 1px solid var(--border);
       border-radius: 8px;
       cursor: pointer;
-      font-size: 0.85rem;
+      font-size: 0.78rem;
       font-family: inherit;
       transition: all 0.15s;
     }
@@ -122,10 +121,13 @@
     <label>Hardware</label>
     <div class="hw-toggle">
       <button class="hw-btn active" id="btn-esp32c3" onclick="selectHardware('esp32c3')">
-        ESP32-C3 Super Mini
+        ESP32-C3<br>Super Mini
       </button>
       <button class="hw-btn" id="btn-m5stick" onclick="selectHardware('m5stick')">
-        M5StickC Plus
+        M5StickC<br>Plus
+      </button>
+      <button class="hw-btn" id="btn-m5sticks3" onclick="selectHardware('m5sticks3')">
+        M5Stick<br>S3
       </button>
     </div>
   </div>
@@ -156,21 +158,28 @@
 const REPO  = 'tophe75/inclinocar';
 const PAGES = 'https://tophe75.github.io/inclinocar';
 
-// Hardware config
+// Hardware config — blOffset differs per chip family
 const HW = {
   esp32c3: {
     tagPrefix:    'fw-esp32c3-',
     manifestPath: `${PAGES}/manifest-esp32c3.json`,
-    binsPath:     'bins/esp32c3',
     label:        'ESP32-C3 Super Mini',
     chip:         'ESP32-C3',
+    blOffset:     0,
   },
   m5stick: {
     tagPrefix:    'fw-m5stick-',
     manifestPath: `${PAGES}/manifest-m5stick.json`,
-    binsPath:     'bins/m5stick',
     label:        'M5StickC Plus',
     chip:         'ESP32',
+    blOffset:     4096,
+  },
+  m5sticks3: {
+    tagPrefix:    'fw-m5sticks3-',
+    manifestPath: `${PAGES}/manifest-m5sticks3.json`,
+    label:        'M5StickS3',
+    chip:         'ESP32-S3',
+    blOffset:     0,
   }
 };
 
@@ -248,22 +257,24 @@ function onVersionChange() {
 
 function buildManifest(tag, assets, hw) {
   const find = name => assets.find(a => a.name === name)?.url;
-  const bl = find('bootloader.bin');
-  const pt = find('partitions.bin');
-  const fw = find('firmware.bin');
+  const bl   = find('bootloader.bin');
+  const pt   = find('partitions.bin');
+  const fw   = find('firmware.bin');
+  const boot = find('boot_app0.bin');
   if (!bl || !pt || !fw) return null;
+
+  const parts = [
+    { path: bl, offset: hw.blOffset },
+    { path: pt, offset: 32768 }
+  ];
+  if (boot) parts.push({ path: boot, offset: 57344 });
+  parts.push({ path: fw, offset: 65536 });
+
   return {
     name: `InclinoCore ${hw.label}`,
     version: tag.replace(hw.tagPrefix, '').replace(/^v/, ''),
     new_install_prompt_erase: true,
-    builds: [{
-      chipFamily: hw.chip,
-      parts: [
-        { path: bl, offset: 0 },
-        { path: pt, offset: 32768 },
-        { path: fw, offset: 65536 }
-      ]
-    }]
+    builds: [{ chipFamily: hw.chip, parts }]
   };
 }
 
