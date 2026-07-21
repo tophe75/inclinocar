@@ -1,11 +1,22 @@
 # PlatformIO build output
 firmware/firmware-esp32c3/.pio/
 firmware/firmware-m5stick/.pio/
+firmware/firmware-m5sticks3/.pio/
 
 # VS Code
 .vscode/
 firmware/firmware-esp32c3/.vscode/
 firmware/firmware-m5stick/.vscode/
+firmware/firmware-m5sticks3/.vscode/
+
+# Flutter
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+
+# Claude Code
+.claude/settings.local.json
 
 # OS
 .DS_Store
