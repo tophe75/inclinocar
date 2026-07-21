@@ -41,7 +41,8 @@ float pitchOffset = 0.0;
 float rollOffset  = 0.0;
 
 // Median filter — eliminates spikes without lag
-#define MF_SIZE 7
+// BMI270 is much less noisy than MPU6886/MPU-6050, so a smaller window stays snappy
+#define MF_SIZE 5
 float pitchBuf[MF_SIZE] = {0};
 float rollBuf[MF_SIZE]  = {0};
 int   mfIndex = 0;
