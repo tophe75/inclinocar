@@ -1,6 +1,6 @@
 # InclinoCar
 
-Rooftop tent leveling assistant using ESP32-C3 and MPU-6050. Displays real-time pitch and roll on an OLED screen and connects to the InclinoCar Android app via Bluetooth.
+Rooftop tent leveling assistant. Runs on three hardware targets (ESP32-C3 + MPU-6050, M5StickC Plus, or M5StickS3), displays real-time pitch and roll on-device, and connects to the InclinoCar Android app via Bluetooth.
 
 ## Web Installer
 
@@ -105,7 +105,7 @@ On power-up the device shows the device nickname, firmware version, MAC address 
 
 ```
   InclinoCore
-  v0.0.4
+  v26.07.2
   E8:3D:C1:9E:43:38
   PIN: 9208
   Cal loaded
@@ -135,13 +135,13 @@ You can redisplay this screen at any time for 10 seconds — handy for reading t
 | Show boot screen for 10s | Redisplay nickname, MAC, and PIN — see device-specific gesture below |
 
 - **ESP32-C3**: the wired push button. Short press / hold 1s as above. **Double-press** (two clicks within 350ms) shows the boot screen — this adds a ~350ms delay before short-press brightness cycling fires, needed to tell a single click from the first half of a double-click.
-- **M5StickC Plus / M5StickS3**: `BtnA` (front button) for short press / hold 1s as above. `BtnB` (side button) shows the boot screen with a single press.
+- **M5StickC Plus / M5StickS3**: `BtnA`, the front button (same side as the display), for short press / hold 1s as above. `BtnB`, the top button, shows the boot screen with a single press. The bottom power button is unrelated to these functions.
 
 Default brightness on first boot is 25%.
 
 ### Calibration
 
-Hold the button for 1 second with the vehicle on flat level ground. The device takes 50 readings and saves the offsets to flash — they survive reboots and firmware updates.
+Hold the button (`BtnA` on the M5 sticks) for 1 second with the vehicle on flat level ground. The device takes 50 readings and saves the offsets to flash — they survive reboots and firmware updates.
 
 ### Bluetooth Pairing
 
