@@ -54,22 +54,23 @@ jobs:
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add docs/bins/m5sticks3/ docs/manifest-m5sticks3.json
-          if git diff --staged --quiet; then
+          if git diff --cached --quiet; then
             echo "Nothing to commit"
             exit 0
           fi
-          git commit -m "ci: m5sticks3 ${GITHUB_REF#refs/tags/}"
-          # actions/checkout defaults to a shallow clone; rebase needs full history
-          # to find the real merge base with origin/main.
-          git fetch --unshallow origin 2>/dev/null || true
-          # Other per-target CI jobs may push to main concurrently — rebase and retry
-          # instead of --force, so parallel tag pushes don't clobber each other's commits.
+          # Other per-target CI jobs may push to main concurrently. Re-point HEAD at
+          # the latest main tip each retry and recommit our staged changes on top —
+          # safe since this job only ever touches its own disjoint
+          # docs/bins/m5sticks3/ + manifest path, and --soft reset needs no shared
+          # history graph (unlike rebase), which matters since actions/checkout
+          # gives a shallow clone by default.
           for i in 1 2 3 4 5; do
             git fetch origin main
-            if git rebase origin/main && git push origin HEAD:main; then
+            git reset --soft origin/main
+            git commit -m "ci: m5sticks3 ${GITHUB_REF#refs/tags/}"
+            if git push origin HEAD:main; then
               exit 0
             fi
-            git rebase --abort 2>/dev/null || true
             sleep $((RANDOM % 5 + 1))
           done
           echo "Failed to push after retries" >&2
