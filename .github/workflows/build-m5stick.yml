@@ -34,39 +34,36 @@ jobs:
       - name: Build firmware
         run: cd firmware/firmware-m5stick && pio run
 
-      - name: Copy binaries
-        run: |
-          mkdir -p docs/bins/m5stick
-          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/bootloader.bin docs/bins/m5stick/
-          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/partitions.bin  docs/bins/m5stick/
-          cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/firmware.bin    docs/bins/m5stick/
-          # boot_app0.bin required for ESP32 OTA boot
-          find ~/.platformio -name "boot_app0.bin" | head -1 | xargs -I{} cp {} docs/bins/m5stick/
-
-      - name: Update manifest
-        run: |
-          TAG=${GITHUB_REF#refs/tags/fw-m5stick-}
-          VER=${TAG#v}
-          sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest-m5stick.json
-
-      - name: Commit binaries
+      - name: Copy binaries, update manifest, and commit
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add docs/bins/m5stick/ docs/manifest-m5stick.json
-          if git diff --cached --quiet; then
-            echo "Nothing to commit"
-            exit 0
-          fi
-          # Other per-target CI jobs may push to main concurrently. Re-point HEAD at
-          # the latest main tip each retry and recommit our staged changes on top —
-          # safe since this job only ever touches its own disjoint
-          # docs/bins/m5stick/ + manifest path, and --soft reset needs no shared
-          # history graph (unlike rebase), which matters since actions/checkout
-          # gives a shallow clone by default.
+          TAG=${GITHUB_REF#refs/tags/fw-m5stick-}
+          VER=${TAG#v}
+          BOOT_APP0=$(find ~/.platformio -name "boot_app0.bin" | head -1)
+          # Other per-target CI jobs may push to main concurrently. Rebuild docs/bins
+          # and the manifest fresh on top of the latest main each retry, using
+          # `git reset --hard` rather than `--soft` — soft leaves the index (and
+          # therefore what gets committed) tied to whatever main looked like at
+          # checkout time, which silently reverts any OTHER target's files that
+          # changed on main in the meantime. Hard reset + re-copy avoids that
+          # entirely: every retry starts from an index that exactly matches the
+          # latest main, so only this target's paths ever end up in the diff.
           for i in 1 2 3 4 5; do
             git fetch origin main
-            git reset --soft origin/main
+            git reset --hard origin/main
+            mkdir -p docs/bins/m5stick
+            cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/bootloader.bin docs/bins/m5stick/
+            cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/partitions.bin  docs/bins/m5stick/
+            cp firmware/firmware-m5stick/.pio/build/m5stick-c-plus/firmware.bin    docs/bins/m5stick/
+            # boot_app0.bin required for ESP32 OTA boot
+            [ -n "$BOOT_APP0" ] && cp "$BOOT_APP0" docs/bins/m5stick/
+            sed -i "s/\"version\": \"[^\"]*\"/\"version\": \"${VER}\"/" docs/manifest-m5stick.json
+            git add docs/bins/m5stick/ docs/manifest-m5stick.json
+            if git diff --cached --quiet; then
+              echo "Nothing to commit"
+              exit 0
+            fi
             git commit -m "ci: m5stick ${GITHUB_REF#refs/tags/}"
             if git push origin HEAD:main; then
               exit 0
