@@ -9,11 +9,12 @@
 #include <esp_mac.h>
 
 // I2C: SDA=GPIO6, SCL=GPIO7
-// Button: GPIO5 → GND (hold 1s = calibrate)
+// Button: GPIO5 → GND (short = brightness, hold 1s = calibrate, double-press = boot screen)
 #define SDA_PIN       6
 #define SCL_PIN       7
 #define BTN_PIN       5
 #define CAL_HOLD_MS   1000
+#define DBL_CLICK_MS  350
 
 // Nordic UART Service UUIDs
 #define NUS_SERVICE_UUID  "6E400001-B5A3-F393-E0A9-E50E24DCCA9E"
@@ -63,6 +64,8 @@ int           brightnessIndex     = 0;
 
 bool          btnWasPressed   = false;
 unsigned long btnPressTime    = 0;
+bool          clickPending    = false;
+unsigned long lastClickTime   = 0;
 bool          calibratePending = false;
 bool          pinVerified      = false;
 
@@ -244,6 +247,24 @@ void cycleBrightness() {
   delay(800);
 }
 
+void drawBootScreen() {
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+    mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+  display.clearDisplay();
+  display.setTextColor(SSD1306_WHITE);
+  display.setTextSize(1);
+  display.setCursor(0, 0);  display.println(deviceNickname);
+  display.setCursor(0, 12); display.println("  " FW_VERSION);
+  display.setCursor(0, 26); display.printf("  %s", macStr);
+  display.setCursor(0, 40); display.printf("  PIN: %04d", devicePIN);
+  display.setCursor(0, 54); display.println(
+    (pitchOffset != 0.0 || rollOffset != 0.0) ? "  Cal loaded" : "  Hold btn: cal");
+  display.display();
+}
+
 void handleButton() {
   bool pressed = (digitalRead(BTN_PIN) == LOW);
   if (pressed && !btnWasPressed) {
@@ -252,11 +273,27 @@ void handleButton() {
   }
   if (!pressed && btnWasPressed) {
     btnWasPressed = false;
-    if (millis() - btnPressTime < CAL_HOLD_MS) cycleBrightness();
+    if (millis() - btnPressTime < CAL_HOLD_MS) {
+      if (clickPending && millis() - lastClickTime < DBL_CLICK_MS) {
+        // Second click within the window — double-press
+        clickPending = false;
+        drawBootScreen();
+        delay(10000);
+      } else {
+        // First click — wait to see if a second one follows
+        clickPending  = true;
+        lastClickTime = millis();
+      }
+    }
   }
   if (pressed && btnWasPressed && millis() - btnPressTime >= CAL_HOLD_MS) {
     btnWasPressed = false;
+    clickPending  = false;
     calibrate();
+  }
+  if (clickPending && millis() - lastClickTime >= DBL_CLICK_MS) {
+    clickPending = false;
+    cycleBrightness();
   }
 }
 
@@ -289,19 +326,7 @@ void setup() {
   Serial.printf("Device PIN: %04d\n", devicePIN);
   applyBrightness();
   setupBLE();
-  display.clearDisplay();
-  uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
-  char macStr[18];
-  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-    mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-  display.setCursor(0, 0);  display.println(deviceNickname);
-  display.setCursor(0, 12); display.println("  " FW_VERSION);
-  display.setCursor(0, 26); display.printf("  %s", macStr);
-  display.setCursor(0, 40); display.printf("  PIN: %04d", devicePIN);
-  display.setCursor(0, 54); display.println(
-    (pitchOffset != 0.0 || rollOffset != 0.0) ? "  Cal loaded" : "  Hold btn: cal");
-  display.display();
+  drawBootScreen();
   delay(5000);
 }
 

@@ -324,6 +324,37 @@ void cycleBrightness() {
   delay(800);
 }
 
+void drawBootScreen() {
+  uint8_t mac[6];
+  esp_read_mac(mac, ESP_MAC_WIFI_STA);
+  char macStr[18];
+  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
+    mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
+
+  M5.Display.fillScreen(C_BG);
+  M5.Display.setTextColor(C_GREEN, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 4);
+  M5.Display.print(deviceNickname);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setCursor(4, 28);
+  M5.Display.print(FW_VERSION);
+  M5.Display.setCursor(4, 44);
+  M5.Display.print(macStr);
+  M5.Display.setTextColor(C_WHITE, C_BG);
+  M5.Display.setTextSize(2);
+  M5.Display.setCursor(4, 68);
+  char pinStr[14];
+  snprintf(pinStr, sizeof(pinStr), "PIN: %04d", devicePIN);
+  M5.Display.print(pinStr);
+  M5.Display.setTextSize(1);
+  M5.Display.setTextColor(C_DIM, C_BG);
+  M5.Display.setCursor(4, 108);
+  M5.Display.print((pitchOffset != 0.0 || rollOffset != 0.0) ?
+    "Cal loaded" : "Hold BtnA: cal");
+}
+
 void handleButton() {
   M5.update();
   bool pressed = M5.BtnA.isPressed();
@@ -338,6 +369,12 @@ void handleButton() {
   if (pressed && btnWasPressed && millis() - btnPressTime >= CAL_HOLD_MS) {
     btnWasPressed = false;
     calibrate();
+  }
+
+  if (M5.BtnB.wasPressed()) {
+    // Show boot screen (nickname, MAC, PIN) for 10s — easier to read the pairing PIN
+    drawBootScreen();
+    delay(10000);
   }
 }
 
@@ -370,34 +407,7 @@ void setup() {
   // Seed filter after everything is loaded
   seedFilters();
 
-  uint8_t mac[6];
-  esp_read_mac(mac, ESP_MAC_WIFI_STA);
-  char macStr[18];
-  snprintf(macStr, sizeof(macStr), "%02X:%02X:%02X:%02X:%02X:%02X",
-    mac[0],mac[1],mac[2],mac[3],mac[4],mac[5]);
-
-  M5.Display.fillScreen(C_BG);
-  M5.Display.setTextColor(C_GREEN, C_BG);
-  M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 4);
-  M5.Display.print(deviceNickname);
-  M5.Display.setTextSize(1);
-  M5.Display.setTextColor(C_DIM, C_BG);
-  M5.Display.setCursor(4, 28);
-  M5.Display.print(FW_VERSION);
-  M5.Display.setCursor(4, 44);
-  M5.Display.print(macStr);
-  M5.Display.setTextColor(C_WHITE, C_BG);
-  M5.Display.setTextSize(2);
-  M5.Display.setCursor(4, 68);
-  char pinStr[14];
-  snprintf(pinStr, sizeof(pinStr), "PIN: %04d", devicePIN);
-  M5.Display.print(pinStr);
-  M5.Display.setTextSize(1);
-  M5.Display.setTextColor(C_DIM, C_BG);
-  M5.Display.setCursor(4, 108);
-  M5.Display.print((pitchOffset != 0.0 || rollOffset != 0.0) ?
-    "Cal loaded" : "Hold BtnA: cal");
+  drawBootScreen();
   delay(5000);
 }
 
