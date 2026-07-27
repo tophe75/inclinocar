@@ -8,10 +8,13 @@ This folder contains STL files for 3D printed parts.
 
 ## Parts
 
-| File | Description | Status |
-|------|-------------|--------|
-| v26.1.0 | ESP32-C3 + OLED case | Publiched |
-| v26.1.0 | Tent bar mounting bracket | Publiched |
+| Folder | File | Description | Status |
+|--------|------|-------------|--------|
+| `core/esp32-c3_supermini/` | Core Case v26.1.0 (Box/Clip/Lid + .3mf) | ESP32-C3 Super Mini + OLED case | Published |
+| `brackets/Taktältarna_Åreskutan_2.0/` | TT Brackets.3mf | Tent bar mounting bracket (project file) | Published |
+| `brackets/Taktältarna_Åreskutan_2.0/` | Core Case v26.1.0 - Bracket | Case variant for Taktältarna Åreskutan 2.0 bracket mount | Published |
+| `brackets/Taktältarna_Åreskutan_2.0/` | Core Case v26.1.1 - Powerbank | Case variant for Taktältarna Åreskutan 2.0, with power bank | Published |
+| `brackets/Taktältarna_Åreskutan_2.0/` | M5S3 v26.07.1 - Bracket | M5StickS3 mount for Taktältarna Åreskutan 2.0 bracket | Published |
 
 ## Print Settings
 

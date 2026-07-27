@@ -111,6 +111,8 @@ On power-up the device shows the device nickname, firmware version, MAC address 
   Cal loaded
 ```
 
+You can redisplay this screen at any time for 10 seconds — handy for reading the pairing PIN without power-cycling the device (see **Button** below).
+
 ### Display
 
 ```
@@ -130,10 +132,10 @@ On power-up the device shows the device nickname, firmware version, MAC address 
 |--------|----------|
 | Short press | Cycle display brightness (25% → 50% → 75% → 100% → 25%) |
 | Hold 1 second | Calibrate (keep device still on flat ground) |
+| Show boot screen for 10s | Redisplay nickname, MAC, and PIN — see device-specific gesture below |
 
-- ESP32-C3: the wired push button
-- M5StickC Plus: side button (BtnB)
-- M5StickS3: front button (BtnA)
+- **ESP32-C3**: the wired push button. Short press / hold 1s as above. **Double-press** (two clicks within 350ms) shows the boot screen — this adds a ~350ms delay before short-press brightness cycling fires, needed to tell a single click from the first half of a double-click.
+- **M5StickC Plus / M5StickS3**: `BtnA` (front button) for short press / hold 1s as above. `BtnB` (side button) shows the boot screen with a single press.
 
 Default brightness on first boot is 25%.
 
