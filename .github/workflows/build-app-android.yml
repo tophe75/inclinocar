@@ -54,16 +54,36 @@ jobs:
           cd app && flutter build apk --release
           cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/InclinoCar-installer.apk
 
+      - name: Generate changelog
+        run: |
+          git fetch --tags --unshallow origin 2>/dev/null || git fetch --tags origin
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git tag -l 'android-v*' --sort=-creatordate | grep -Fxv "$CURRENT_TAG" | head -1)
+          {
+            echo "**Android APK**"
+            echo ""
+            echo "**Install instructions:**"
+            echo "1. Download \`app-release.apk\` below"
+            echo "2. On your Android phone: Settings → Security → Install unknown apps → allow your browser"
+            echo "3. Open the downloaded APK and tap Install"
+            echo ""
+            echo "## What's Changed"
+            if [ -n "$PREV_TAG" ]; then
+              LOG=$(git log --pretty=format:'- %s' "${PREV_TAG}..${CURRENT_TAG}" -- app/ 2>/dev/null)
+              if [ -n "$LOG" ]; then
+                echo "$LOG"
+              else
+                echo "No app changes since ${PREV_TAG}."
+              fi
+            else
+              echo "First release for this target."
+            fi
+          } > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: InclinoCar Android ${{ github.ref_name }}
-          body: |
-            **Android APK**
-
-            **Install instructions:**
-            1. Download `app-release.apk` below
-            2. On your Android phone: Settings → Security → Install unknown apps → allow your browser
-            3. Open the downloaded APK and tap Install
+          body_path: release-notes.md
           files: app/build/app/outputs/flutter-apk/InclinoCar-installer.apk

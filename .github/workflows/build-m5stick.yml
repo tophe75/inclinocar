@@ -73,14 +73,34 @@ jobs:
           echo "Failed to push after retries" >&2
           exit 1
 
+      - name: Generate changelog
+        run: |
+          git fetch --tags --unshallow origin 2>/dev/null || git fetch --tags origin
+          CURRENT_TAG="${GITHUB_REF#refs/tags/}"
+          PREV_TAG=$(git tag -l 'fw-m5stick-v*' --sort=-creatordate | grep -Fxv "$CURRENT_TAG" | head -1)
+          {
+            echo "Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge."
+            echo "Select **M5StickC Plus** from the hardware dropdown."
+            echo ""
+            echo "## What's Changed"
+            if [ -n "$PREV_TAG" ]; then
+              LOG=$(git log --pretty=format:'- %s' "${PREV_TAG}..${CURRENT_TAG}" -- firmware/firmware-m5stick/ 2>/dev/null)
+              if [ -n "$LOG" ]; then
+                echo "$LOG"
+              else
+                echo "No source changes for this target since ${PREV_TAG}."
+              fi
+            else
+              echo "First release for this target."
+            fi
+          } > release-notes.md
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           name: InclinoCore M5StickC Plus ${{ github.ref_name }}
-          body: |
-            Flash via the [Web Installer](https://tophe75.github.io/inclinocar/) using Chrome or Edge.
-            Select **M5StickC Plus** from the hardware dropdown.
+          body_path: release-notes.md
           files: |
             docs/bins/m5stick/bootloader.bin
             docs/bins/m5stick/partitions.bin
