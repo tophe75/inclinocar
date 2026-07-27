@@ -59,6 +59,9 @@ jobs:
             exit 0
           fi
           git commit -m "ci: m5sticks3 ${GITHUB_REF#refs/tags/}"
+          # actions/checkout defaults to a shallow clone; rebase needs full history
+          # to find the real merge base with origin/main.
+          git fetch --unshallow origin 2>/dev/null || true
           # Other per-target CI jobs may push to main concurrently — rebase and retry
           # instead of --force, so parallel tag pushes don't clobber each other's commits.
           for i in 1 2 3 4 5; do
