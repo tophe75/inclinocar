@@ -1,6 +1,6 @@
 {
   "name": "InclinoCore M5StickS3",
-  "version": "26.07.1",
+  "version": "26.07.2",
   "new_install_prompt_erase": true,
   "builds": [{
     "chipFamily": "ESP32-S3",
