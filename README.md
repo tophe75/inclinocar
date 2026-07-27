@@ -135,7 +135,7 @@ You can redisplay this screen at any time for 10 seconds — handy for reading t
 | Show boot screen for 10s | Redisplay nickname, MAC, and PIN — see device-specific gesture below |
 
 - **ESP32-C3**: the wired push button. Short press / hold 1s as above. **Double-press** (two clicks within 350ms) shows the boot screen — this adds a ~350ms delay before short-press brightness cycling fires, needed to tell a single click from the first half of a double-click.
-- **M5StickC Plus / M5StickS3**: `BtnA`, the front button (same side as the display), for short press / hold 1s as above. `BtnB`, the top button, shows the boot screen with a single press. The bottom power button is unrelated to these functions.
+- **M5StickC Plus / M5StickS3**: `BtnA`, the front button (same side as the display — labeled **M5** on the M5StickC Plus; unlabeled but colored blue on the M5StickS3), for short press / hold 1s as above. `BtnB`, the top button, shows the boot screen with a single press. The bottom power button is unrelated to these functions.
 
 Default brightness on first boot is 25%.
 
