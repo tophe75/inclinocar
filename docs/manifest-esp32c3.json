@@ -1,6 +1,6 @@
 {
   "name": "InclinoCore ESP32-C3",
-  "version": "0.0.33",
+  "version": "26.07.2",
   "new_install_prompt_erase": true,
   "builds": [{
     "chipFamily": "ESP32-C3",
