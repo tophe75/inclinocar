@@ -106,11 +106,20 @@ and your local will be behind.
 - Flash bootloader offset `0x0` (ESP32-S3), needs `boot_app0.bin` at `0xe000`.
 - Mounted display-face-left: gravity on **+Y** (differs from StickC Plus). Axis:
   `pitch = -atan2(ax, ay)`, `roll = atan2(az, ay)`.
-- **KNOWN HARDWARE ISSUE**: boot-loops when plugged into a PC with no serial monitor
-  open. Cause: ESP32-S3 USB-Serial/JTAG resets the chip on host DTR/RTS line changes;
-  the S3 has no register to disable this (the C6 does, via `USB_UART_CHIP_RST_DIS`).
-  `Serial.setTxTimeoutMs(0)` does NOT fix it. Works fine on battery, charger, power
-  bank, car USB. Documented in README, not fixable in firmware.
+- **KNOWN ISSUE**: freezes in place (confirmed NOT a reboot — no boot screen replay)
+  when connected to a PC via USB with no application actively reading the serial
+  port, e.g. VS Code/PlatformIO open with no serial monitor attached. Opening a
+  serial monitor un-freezes it immediately; closing the monitor freezes it again —
+  consistent with a blocked/full USB-CDC TX buffer, though `Serial.setTxTimeoutMs(0)`
+  (already applied, see `main.cpp`) does not fully prevent it, so the exact mechanism
+  isn't fully confirmed. An earlier theory attributed this to the ESP32-S3
+  USB-Serial/JTAG peripheral resetting the chip on host DTR/RTS line changes (the S3
+  has no `USB_UART_CHIP_RST_DIS`-equivalent disable register, unlike the C6) — but
+  a DTR/RTS-triggered chip reset would show the boot screen replay, which doesn't
+  happen, so that theory doesn't fully fit the confirmed symptom either. Only affects
+  this specific USB dev-workflow scenario: works fine on battery, charger, power
+  bank, car USB, and through the Web Installer (its console actively reads the
+  output). Documented in README, not fixable in firmware so far.
 
 ## Web installer (`docs/index.html`)
 

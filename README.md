@@ -51,7 +51,7 @@ All-in-one unit with the newer BMI270 IMU — noticeably more stable than the MP
 
 [M5StickS3](https://shop.m5stack.com/products/m5sticks3-esp32s3-mini-iot-dev-kit)
 
-> ℹ️ The M5StickS3 (ESP32-S3) may reset repeatedly when plugged into a PC **without** a serial terminal open. This is an ESP32-S3 USB-JTAG hardware behaviour and cannot be disabled in firmware on this chip. It does not affect normal use — the device runs fine on its battery, a USB charger, a power bank, or a car USB port.
+> ℹ️ The M5StickS3 can **freeze (not reboot)** when connected to a PC via USB with no application actively reading the serial port — e.g. developing with VS Code/PlatformIO open but no serial monitor attached. It stays frozen on whatever it last displayed; opening a serial monitor un-freezes it immediately, closing the monitor again re-freezes it. This only affects that specific dev-workflow scenario — it does not happen through the [Web Installer](https://tophe75.github.io/inclinocar/) (its console actively reads the output), and normal use (battery, USB charger, power bank, car USB, or connected only to the phone app) is unaffected.
 
 ### Wiring (ESP32-C3 only)
 
@@ -172,7 +172,7 @@ The device sends JSON over Nordic UART Service (NUS) every 100ms:
 | Display blank after flash (ESP32-C3) | Check SDA=GPIO6, SCL=GPIO7, VCC=3.3V |
 | IMU not found (ESP32-C3) | Check MPU-6050 wiring, AD0 must be GND |
 | M5 stick won't flash | Hold power button ~2s to enter download mode |
-| M5StickS3 resets when plugged into PC | Normal — open a serial monitor, or just run it on battery/charger. ESP32-S3 hardware behaviour. |
+| M5StickS3 freezes when connected to PC (VS Code open, no serial monitor) | Normal — open a serial monitor to un-freeze it, or run on battery/charger/power bank instead. Only affects USB dev workflows, not normal use or the Web Installer. |
 | Values drifting | Hold button 1s to calibrate |
 | App can't find device | Menu → Scan for InclinoCore, check device is powered on |
 | Wrong PIN | Check the device display — PIN is shown on boot screen and top-right when not connected |
